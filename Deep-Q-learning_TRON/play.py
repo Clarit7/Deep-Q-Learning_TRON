@@ -64,10 +64,13 @@ def main():
 
 		pygame.mouse.set_visible(False)
 
-		window = Window(game, 40)
-		# displayGameMenu(window, game)
+		if VisibleScreen:
+			window = Window(game, 40)
+			# displayGameMenu(window, game)
+			game.main_loop(window)
+		else:
+			game.main_loop()
 
-		game.main_loop(window)
 		printGameResults(game)
 
 if __name__ == '__main__':
