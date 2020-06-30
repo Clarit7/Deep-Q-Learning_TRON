@@ -11,9 +11,10 @@ import numpy as np
 import random
 
 import os
+from tron.constant import *
 
 # General parameters
-folderName = 'survivor'
+folderName = 'basic'
 
 # Net parameters
 BATCH_SIZE = 128
@@ -25,8 +26,8 @@ ESPILON_END = 0.05
 DECAY_RATE = 0.999
 
 # Map parameters
-MAP_WIDTH = 10
-MAP_HEIGHT = 10
+MAP_WIDTH = GameSize
+MAP_HEIGHT = GameSize
 
 # Memory parameters
 MEM_CAPACITY = 10000
@@ -44,13 +45,13 @@ class Net(nn.Module):
 		self.gamma = GAMMA
 		self.conv1 = nn.Conv2d(1, 32, 6)
 		self.conv2 = nn.Conv2d(32, 64, 3)
-		self.fc1 = nn.Linear(64*5*5, 512)
+		self.fc1 = nn.Linear(64*(GameSize - 5)*(GameSize - 5), 512)
 		self.fc2 = nn.Linear(512, 4)
 
 	def forward(self, x):
 		x = F.relu(self.conv1(x))
 		x = F.relu(self.conv2(x))
-		x = x.view(-1, 64*5*5)
+		x = x.view(-1, 64*(GameSize - 5)*(GameSize - 5))
 		x = F.relu(self.fc1(x))
 		x = self.fc2(x)
 		return x
@@ -63,13 +64,10 @@ class Ai(Player):
 		self.net = Net()
 		self.epsilon = epsilon
 		# Load network weights if they have been initialized already
-		if os.path.isfile('ais/' + folderName + '/ai.bak'):
-			self.net.load_state_dict(torch.load('ais/' + folderName + '/ai.bak'))
-			#print("load reussi 1 ")
-			
-		elif os.path.isfile(self.find_file('ai.bak')):
-			self.net.load_state_dict(torch.load(self.find_file('ai.bak')))
-			#print("load reussi 2 ")
+
+		if os.path.isfile('ais/' + folderName + '/' + str(GameSize) + '_ai.bak'):
+			self.net.load_state_dict(torch.load('ais/' + folderName +'/' + str(GameSize) + '_ai.bak'))
+
 
 	def action(self, map, id):
 
@@ -180,14 +178,16 @@ def train(model):
 			old_state_p2 = torch.from_numpy(old_state_p2).float()
 
 			# Run the game
-			window = Window(game, 40)
-			game.main_loop(window)
-			#game.main_loop()
+			if VisibleScreen:
+				window = Window(game, 40)
+				game.main_loop(window)
+			else:
+				game.main_loop()
 
 			# Analyze the game
 			move_counter += len(game.history)
 			terminal = False
-			
+
 			for historyStep in range(len(game.history)-1):
 
 				# Get the state for each player
@@ -241,7 +241,7 @@ def train(model):
 			if nouv_epsilon > ESPILON_END:
 				epsilon = nouv_epsilon
 			if epsilon==0 and game_counter%100==0 :
-				epsilon = espilon_temp
+				epsilon = epsilon_temp
 
 		# Get a sample for training
 		transitions = memory.sample(min(len(memory),model.batch_size))
@@ -256,7 +256,7 @@ def train(model):
 		pred_q_values_next_batch = model(new_state_batch)
 
 		# Compute targeted Q-value for action performed
-		target_q_values_batch = torch.cat(tuple(reward_batch[i] if batch[4]
+		target_q_values_batch = torch.cat(tuple(reward_batch[i] if batch[4][i]
 					   else reward_batch[i] + model.gamma * torch.max(pred_q_values_next_batch[i])
 					   for i in range(len(reward_batch))))
 
@@ -272,7 +272,7 @@ def train(model):
 		optimizer.step()
 
 		# Update bak
-		torch.save(model.state_dict(), 'ais/' + folderName + '/ai.bak')
+		torch.save(model.state_dict(), 'ais/' + folderName + '/' + str(GameSize) +'_ai.bak')
 
 		# Display results
 		if (game_counter%DISPLAY_CYCLE)==0:
@@ -291,8 +291,8 @@ def train(model):
 
 def main():
 	model = Net()
-	if os.path.isfile('ais/' + folderName + '/ai.bak'):
-		model.load_state_dict(torch.load('ais/' + folderName + '/ai.bak'))
+	# if os.path.isfile('ais/' + folderName + '/10_ai.bak'):
+	#   	model.load_state_dict(torch.load('ais/' + folderName + '/10_ai.bak'))
 	train(model)
 
 if __name__ == "__main__":

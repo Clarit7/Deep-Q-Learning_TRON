@@ -2,6 +2,7 @@ from time import sleep
 from enum import Enum
 
 from tron.map import Map, Tile
+from tron.constant import *
 
 class Winner(Enum):
     PLAYER_ONE = 1
@@ -124,7 +125,7 @@ class Game:
             alive = None
 
             if window:
-                sleep(0.3)
+                sleep(GameSpeed)
 				#sleep(0.5)
 
             if not self.next_frame(window):
