@@ -30,10 +30,10 @@ class Player(object):
         if direction == Direction.LEFT:
             return (current_position[0], current_position[1] - 1)
 
-    def next_position_and_direction(self, current_position, id, map):
+    def next_position_and_direction(self, current_position, id, last_direction, map):
 
-        direction = self.action(map, id)
-        return (self.next_position(current_position, direction), direction)
+        direction, action = self.action(map, last_direction, id)
+        return (self.next_position(current_position, direction), direction, action)
 
     def action(self, map, id):
 

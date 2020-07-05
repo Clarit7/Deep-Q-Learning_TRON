@@ -15,6 +15,7 @@ class PositionPlayer:
         self.player = player
         self.position = position
         self.alive = True
+        self.action = None
 
     def body(self):
  
@@ -37,7 +38,8 @@ class HistoryElement:
         self.map = mmap
         self.player_one_direction = player_one_direction
         self.player_two_direction = player_two_direction
-
+        self.player_one_action = None
+        self.player_two_action = None
 
 class Game:
 
@@ -66,7 +68,13 @@ class Game:
 
         for id, pp in enumerate(self.pps):
             try:
-                (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, id + 1, self.map())
+                if len(self.history) <= 1:
+                    (pp.position, pp.player.direction, pp.action) = pp.player.next_position_and_direction(pp.position, id + 1, None, self.map())
+                else:
+                    if id == 0:
+                        (pp.position, pp.player.direction, pp.action) = pp.player.next_position_and_direction(pp.position, id + 1, self.history[-2].player_one_direction, self.map())
+                    else:
+                        (pp.position, pp.player.direction, pp.action) = pp.player.next_position_and_direction(pp.position, id + 1, self.history[-2].player_two_direction, self.map())
             except:
                 print("ERRRRRRRRRRRRRRRRRRRRROR")
                 if id == 0:
@@ -77,6 +85,8 @@ class Game:
 
         self.history[-1].player_one_direction = self.pps[0].player.direction
         self.history[-1].player_two_direction = self.pps[1].player.direction
+        self.history[-1].player_one_action = self.pps[0].action
+        self.history[-1].player_two_action = self.pps[1].action
 
         if window:
             import pygame

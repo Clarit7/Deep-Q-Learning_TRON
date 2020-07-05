@@ -46,7 +46,7 @@ class Net(nn.Module):
 		self.conv1 = nn.Conv2d(1, 32, 6)
 		self.conv2 = nn.Conv2d(32, 64, 3)
 		self.fc1 = nn.Linear(64*(GameSize - 5)*(GameSize - 5), 512)
-		self.fc2 = nn.Linear(512, 4)
+		self.fc2 = nn.Linear(512, 3)
 
 	def forward(self, x):
 		x = F.relu(self.conv1(x))
@@ -69,9 +69,24 @@ class Ai(Player):
 			self.net.load_state_dict(torch.load('ais/' + folderName +'/' + str(GameSize) + '_ai.bak'))
 
 
-	def action(self, map, id):
+	def action(self, map, last_direction, id):
 
 		game_map = map.state_for_player(id)
+		ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+
+		start_direction = 0
+		while (last_direction == None):
+			start_direction = random.randint(1, 4)
+			if start_direction == 1 and game_map[ind[0]-1][ind[1]] == 1:
+				last_direction = Direction.LEFT
+			elif start_direction == 2 and game_map[ind[0]][ind[1]+1] == 1:
+				last_direction = Direction.DOWN
+			elif start_direction == 3 and game_map[ind[0]+1][ind[1]] == 1:
+				last_direction = Direction.RIGHT
+			elif start_direction == 4 and game_map[ind[0]][ind[1]-1] == 1:
+				last_direction = Direction.UP
+
+		game_map[ind] += start_direction * 10
 
 		input = np.reshape(game_map, (1, 1, game_map.shape[0], game_map.shape[1]))
 		input = torch.from_numpy(input).float()
@@ -82,18 +97,30 @@ class Ai(Player):
 		next_action = predicted[0] + 1
 
 		if random.random() <= self.epsilon:
-			next_action = random.randint(1,4)
+			next_action = random.randint(1,3)
 
 		if next_action == 1:
-			next_direction = Direction.UP
+			next_direction = last_direction
 		if next_action == 2:
-			next_direction = Direction.RIGHT
+			if last_direction == Direction.UP:
+				next_direction = Direction.RIGHT
+			elif last_direction == Direction.RIGHT:
+				next_direction = Direction.DOWN
+			elif last_direction == Direction.DOWN:
+				next_direction = Direction.LEFT
+			elif last_direction == Direction.LEFT:
+				next_direction = Direction.UP
 		if next_action == 3:
-			next_direction = Direction.DOWN
-		if next_action == 4:
-			next_direction = Direction.LEFT
+			if last_direction == Direction.UP:
+				next_direction = Direction.LEFT
+			elif last_direction == Direction.RIGHT:
+				next_direction = Direction.UP
+			elif last_direction == Direction.DOWN:
+				next_direction = Direction.RIGHT
+			elif last_direction == Direction.LEFT:
+				next_direction = Direction.DOWN
 
-		return next_direction
+		return next_direction, next_action
 
 
 Transition = namedtuple('Transition',('old_state', 'action', 'new_state', 'reward', 'terminal'))
@@ -171,11 +198,9 @@ def train(model):
 
 			# Get the initial state for each player
 			old_state_p1 = game.map().state_for_player(1)
-			old_state_p1 = np.reshape(old_state_p1, (1, 1, old_state_p1.shape[0], old_state_p1.shape[1]))
-			old_state_p1 = torch.from_numpy(old_state_p1).float()
+			ind1 = np.unravel_index(np.argmax(old_state_p1, axis=None), old_state_p1.shape)
 			old_state_p2 = game.map().state_for_player(2)
-			old_state_p2 = np.reshape(old_state_p2, (1, 1, old_state_p2.shape[0], old_state_p2.shape[1]))
-			old_state_p2 = torch.from_numpy(old_state_p2).float()
+			ind2 = np.unravel_index(np.argmax(old_state_p2, axis=None), old_state_p2.shape)
 
 			# Run the game
 			if VisibleScreen:
@@ -183,6 +208,14 @@ def train(model):
 				game.main_loop(window)
 			else:
 				game.main_loop()
+
+
+			old_state_p1[ind1] = 10 + (game.history[0].player_one_direction.value) * 10
+			old_state_p1 = np.reshape(old_state_p1, (1, 1, old_state_p1.shape[0], old_state_p1.shape[1]))
+			old_state_p1 = torch.from_numpy(old_state_p1).float()
+			old_state_p2[ind2] = 10 + (game.history[0].player_two_direction.value) * 10
+			old_state_p2 = np.reshape(old_state_p2, (1, 1, old_state_p2.shape[0], old_state_p2.shape[1]))
+			old_state_p2 = torch.from_numpy(old_state_p2).float()
 
 			# Analyze the game
 			move_counter += len(game.history)
@@ -192,16 +225,27 @@ def train(model):
 
 				# Get the state for each player
 				new_state_p1 = game.history[historyStep+1].map.state_for_player(1)
+				ind1 = np.unravel_index(np.argmax(new_state_p1, axis=None), new_state_p1.shape)
+				if game.history[historyStep+1].player_one_direction == None:
+					new_state_p1[ind1] = 100
+				else:
+					new_state_p1[ind1] = 10 + (game.history[historyStep+1].player_one_direction.value) * 10
 				new_state_p1 = np.reshape(new_state_p1, (1, 1, new_state_p1.shape[0], new_state_p1.shape[1]))
 				new_state_p1 = torch.from_numpy(new_state_p1).float()
+
 				new_state_p2 = game.history[historyStep+1].map.state_for_player(2)
+				ind2 = np.unravel_index(np.argmax(new_state_p2, axis=None), new_state_p2.shape)
+				if game.history[historyStep+1].player_one_direction == None:
+					new_state_p2[ind2] = 100
+				else:
+					new_state_p2[ind2] = 10 + (game.history[historyStep + 1].player_two_direction.value) * 10
 				new_state_p2 = np.reshape(new_state_p2, (1, 1, new_state_p2.shape[0], new_state_p2.shape[1]))
 				new_state_p2 = torch.from_numpy(new_state_p2).float()
 
 				# Get the action for each player
 				if game.history[historyStep].player_one_direction is not None:
-					action_p1 = torch.from_numpy(np.array([game.history[historyStep].player_one_direction.value-1], dtype=np.float32)).unsqueeze(0)
-					action_p2 = torch.from_numpy(np.array([game.history[historyStep].player_two_direction.value-1], dtype=np.float32)).unsqueeze(0)
+					action_p1 = torch.from_numpy(np.array([game.history[historyStep].player_one_action -1], dtype=np.float32)).unsqueeze(0)
+					action_p2 = torch.from_numpy(np.array([game.history[historyStep].player_two_action -1], dtype=np.float32)).unsqueeze(0)
 				else:
 					action_p1 = torch.from_numpy(np.array([0], dtype=np.float32)).unsqueeze(0)
 					action_p2 = torch.from_numpy(np.array([0], dtype=np.float32)).unsqueeze(0)
