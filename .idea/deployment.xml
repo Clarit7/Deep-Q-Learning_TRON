@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="jaylee@210.115.46.57:3300" showNewOnTargetInSync="false">
+    <serverData>
+      <paths name="jaylee">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/Programming/Tron_origin" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="jaylee@210.115.46.57:3300">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/jaylee/Programming/Tron_origin/Deep-Q-learning_TRON" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>

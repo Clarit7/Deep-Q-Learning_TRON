@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="f7ceb6d5-d23a-498c-9ac4-9af0f7f1fc13" name="jaylee" url="http://210.115.46.57">
+        <fileTransfer host="210.115.46.57" port="3300" rootFolder="/home/jaylee" accessType="SFTP">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+          <option name="port" value="3300" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

@@ -14,7 +14,7 @@ import os
 from tron.constant import *
 
 # General parameters
-folderName = 'basic'
+folderName = 'survivor'
 
 # Net parameters
 BATCH_SIZE = 128
@@ -72,17 +72,46 @@ class Ai(Player):
 	def action(self, map, id):
 
 		game_map = map.state_for_player(id)
+		ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+		blocked = np.zeros(4)
+
+		if game_map[ind[0], ind[1]-1] != 1:
+			blocked[0] = 1
+		if game_map[ind[0]+1, ind[1]] != 1:
+			blocked[1] = 1
+		if game_map[ind[0], ind[1]+1] != 1:
+			blocked[2] = 1
+		if game_map[ind[0]-1, ind[1]] != 1:
+			blocked[3] = 1
+
+		all_blocked = True
+		for element in blocked:
+			if element == 0:
+				all_blocked = False
+				break
 
 		input = np.reshape(game_map, (1, 1, game_map.shape[0], game_map.shape[1]))
 		input = torch.from_numpy(input).float()
 		output = self.net(input)
 
 		_, predicted = torch.max(output.data, 1)
+		array = output.data.numpy()
+		array = np.vstack([array, [1, 2, 3, 4], blocked])
+		newarray = array[:, array[0, :].argsort()[::-1]]
 		predicted = predicted.numpy()
 		next_action = predicted[0] + 1
 
+		if not all_blocked and newarray[2, 0] == 1:
+			for i in range(3):
+				if newarray[2, i + 1] == 0:
+					next_action == newarray[1, i + 1]
+					break
+
 		if random.random() <= self.epsilon:
-			next_action = random.randint(1,4)
+			next_action = random.randint(1, 4)
+			if not all_blocked:
+				while (blocked[next_action - 1] == 1):
+					next_action = random.randint(1, 4)
 
 		if next_action == 1:
 			next_direction = Direction.UP
@@ -190,14 +219,6 @@ def train(model):
 
 			for historyStep in range(len(game.history)-1):
 
-				# Get the state for each player
-				new_state_p1 = game.history[historyStep+1].map.state_for_player(1)
-				new_state_p1 = np.reshape(new_state_p1, (1, 1, new_state_p1.shape[0], new_state_p1.shape[1]))
-				new_state_p1 = torch.from_numpy(new_state_p1).float()
-				new_state_p2 = game.history[historyStep+1].map.state_for_player(2)
-				new_state_p2 = np.reshape(new_state_p2, (1, 1, new_state_p2.shape[0], new_state_p2.shape[1]))
-				new_state_p2 = torch.from_numpy(new_state_p2).float()
-
 				# Get the action for each player
 				if game.history[historyStep].player_one_direction is not None:
 					action_p1 = torch.from_numpy(np.array([game.history[historyStep].player_one_direction.value-1], dtype=np.float32)).unsqueeze(0)
@@ -206,19 +227,33 @@ def train(model):
 					action_p1 = torch.from_numpy(np.array([0], dtype=np.float32)).unsqueeze(0)
 					action_p2 = torch.from_numpy(np.array([0], dtype=np.float32)).unsqueeze(0)
 
+				# Get the state for each player
+				new_state_p1 = game.history[historyStep + 1].map.state_for_player(1)
+				new_state_p2 = game.history[historyStep + 1].map.state_for_player(2)
+
 				# Compute the reward for each player
 				reward_p1 = +1
 				reward_p2 = +1
 				if historyStep +1 == len(game.history)-1:
+					ind1 = np.unravel_index(np.argmax(new_state_p1, axis=None), new_state_p1.shape)
+					ind2 = np.unravel_index(np.argmax(new_state_p2, axis=None), new_state_p2.shape)
 					if game.winner is None:
 						null_games += 1
+						new_state_p1[ind1] = 50
+						new_state_p1[ind2] = -50
+						new_state_p2[ind2] = 50
+						new_state_p2[ind1] = -50
 						reward_p1 = 0
 						reward_p2 = 0
 					elif game.winner == 1:
+						new_state_p1[ind2] = -50
+						new_state_p2[ind2] = 50
 						reward_p1 = 100
 						reward_p2 = -25
 						p1_victories +=1
 					else:
+						new_state_p1[ind1] = 50
+						new_state_p2[ind1] = -50
 						reward_p1 = -25
 						reward_p2 = 100
 						p2_victories += 1
@@ -226,6 +261,12 @@ def train(model):
 
 				reward_p1 = torch.from_numpy(np.array([reward_p1], dtype=np.float32)).unsqueeze(0)
 				reward_p2 = torch.from_numpy(np.array([reward_p2], dtype=np.float32)).unsqueeze(0)
+
+				# convert the state from numpy to torch
+				new_state_p1 = np.reshape(new_state_p1, (1, 1, new_state_p1.shape[0], new_state_p1.shape[1]))
+				new_state_p1 = torch.from_numpy(new_state_p1).float()
+				new_state_p2 = np.reshape(new_state_p2, (1, 1, new_state_p2.shape[0], new_state_p2.shape[1]))
+				new_state_p2 = torch.from_numpy(new_state_p2).float()
 
 				# Save the transition for each player
 				memory.push(old_state_p1, action_p1, new_state_p1, reward_p1, terminal)
