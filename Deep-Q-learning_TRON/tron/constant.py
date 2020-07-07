@@ -1,3 +1,4 @@
-GameSize = 10
-GameSpeed = 0.2
-VisibleScreen = True
+GameSize = 20
+GameSpeed = 0.1
+PlayVisibleScreen = True
+TrainVisibleScreen = False

@@ -64,7 +64,7 @@ def main():
 
 		pygame.mouse.set_visible(False)
 
-		if VisibleScreen:
+		if PlayVisibleScreen:
 			window = Window(game, 40)
 			# displayGameMenu(window, game)
 			game.main_loop(window)

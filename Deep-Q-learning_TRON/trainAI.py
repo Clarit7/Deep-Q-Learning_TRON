@@ -71,7 +71,7 @@ def train():
 
 
 			# Run the game
-			if VisibleScreen:
+			if TrainVisibleScreen:
 				window = Window(game, 40)
 				game.main_loop(window)
 			else:
@@ -84,7 +84,7 @@ def train():
 		# survivor_loss = player_2.train(game)
 
 		player_1.save_model()
-		# player_2.save_model()
+		player_2.save_model()
 
 
 		# Display results
