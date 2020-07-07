@@ -31,6 +31,9 @@ MEM_CAPACITY = 10000
 
 Transition = namedtuple('Transition',('old_state', 'action', 'new_state', 'reward', 'terminal'))
 
+# Set cuda
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class ReplayMemory(object):
 
@@ -82,7 +85,7 @@ class Ai(Player):
 		epsilon = EPSILON_START
 		epsilon_temp = float(epsilon)
 
-		self.net = Net()
+		self.net = Net().to(device)
 		self.epsilon = epsilon
 
 
@@ -102,11 +105,11 @@ class Ai(Player):
 		game_map = map.state_for_player(id)
 
 		input = np.reshape(game_map, (1, 1, game_map.shape[0], game_map.shape[1]))
-		input = torch.from_numpy(input).float()
+		input = torch.from_numpy(input).float().to(device)
 		output = self.net(input)
 
 		_, predicted = torch.max(output.data, 1)
-		predicted = predicted.numpy()
+		predicted = predicted.cpu().detach().numpy()
 		next_action = predicted[0] + 1
 
 		if random.random() <= self.epsilon:
@@ -192,10 +195,10 @@ class Ai(Player):
 		# Get a sample for training
 		transitions = self.memory.sample(min(len(self.memory), self.net.batch_size))
 		batch = Transition(*zip(*transitions))
-		old_state_batch = torch.cat(batch.old_state)
-		action_batch = torch.cat(batch.action).long()
-		new_state_batch = torch.cat(batch.new_state)
-		reward_batch = torch.cat(batch.reward)
+		old_state_batch = torch.cat(batch.old_state).to(device)
+		action_batch = torch.cat(batch.action).long().to(device)
+		new_state_batch = torch.cat(batch.new_state).to(device)
+		reward_batch = torch.cat(batch.reward).to(device)
 
 		# Compute predicted Q-values for each action
 		pred_q_values_batch = torch.sum(self.net(old_state_batch).gather(1, action_batch), dim=1)
