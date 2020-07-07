@@ -58,8 +58,8 @@ def main():
 			x1, y1 = randomPosition(width, height)
 
 		game = Game(width, height, [
-			PositionPlayer(1, AiBasic(), [x1,y1]),
-			PositionPlayer(2, Aisurvivor(), [x2,y2]),
+			PositionPlayer(1, AiBasic(False), [x1,y1]),
+			PositionPlayer(2, Aisurvivor(False), [x2,y2]),
 		])
 
 		pygame.mouse.set_visible(False)

@@ -57,7 +57,7 @@ class ReplayMemory(object):
 
 class Net(nn.Module):
 
-	def __init__(self):
+	def __init__(self, train = True):
 		super(Net, self).__init__()
 		self.batch_size = BATCH_SIZE
 		self.gamma = GAMMA
@@ -65,6 +65,7 @@ class Net(nn.Module):
 		self.conv2 = nn.Conv2d(32, 64, 3)
 		self.fc1 = nn.Linear(64*(GameSize - 5)*(GameSize - 5), 512)
 		self.fc2 = nn.Linear(512, 4)
+		self.training = train
 
 	def forward(self, x):
 		x = F.relu(self.conv1(x))
@@ -78,16 +79,14 @@ class Net(nn.Module):
 class Ai(Player):
 
 
-	def __init__(self, use_gpu=True):
+	def __init__(self, train = True):
 		super(Ai, self).__init__()
 
-		self.use_gpu = use_gpu
-
 		# Initialize exploration rate
-		epsilon = EPSILON_START
+		epsilon = EPSILON_START if train else 0
 		epsilon_temp = float(epsilon)
 
-		self.net = Net().to(device)
+		self.net = Net(train).to(device)
 		self.epsilon = epsilon
 
 
