@@ -1,6 +1,7 @@
 
 from enum import Enum
 import random
+import numpy as np
 
 class Direction(Enum):
 
@@ -100,10 +101,32 @@ class RandomPlayer(Player):
 
     def __init__(self):
         super(RandomPlayer, self).__init__()
-        self.direction = self.action(None, None)
+        self.direction = None
 
     def action(self, map, id):
+        game_map = map.state_for_player(id)
+        ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+        blocked = np.zeros(4)
+
+        if game_map[ind[0], ind[1] - 1] != 1:
+            blocked[0] = 1
+        if game_map[ind[0] + 1, ind[1]] != 1:
+            blocked[1] = 1
+        if game_map[ind[0], ind[1] + 1] != 1:
+            blocked[2] = 1
+        if game_map[ind[0] - 1, ind[1]] != 1:
+            blocked[3] = 1
+
+        all_blocked = True
+        for element in blocked:
+            if element == 0:
+                all_blocked = False
+                break
+
         next_action = random.randint(1, 4)
+        if not all_blocked:
+            while (blocked[next_action - 1] == 1):
+                next_action = random.randint(1, 4)
 
         if next_action == 1:
             self.direction = Direction.UP
