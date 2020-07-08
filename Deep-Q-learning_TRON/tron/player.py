@@ -1,6 +1,6 @@
 
 from enum import Enum
-
+import random
 
 class Direction(Enum):
 
@@ -92,5 +92,26 @@ class KeyboardPlayer(Player):
                 self.direction = Direction.DOWN
 
     def action(self, map, id):
+
+        return self.direction
+
+
+class RandomPlayer(Player):
+
+    def __init__(self):
+        super(RandomPlayer, self).__init__()
+        self.direction = self.action(None, None)
+
+    def action(self, map, id):
+        next_action = random.randint(1, 4)
+
+        if next_action == 1:
+            self.direction = Direction.UP
+        if next_action == 2:
+            self.direction = Direction.RIGHT
+        if next_action == 3:
+            self.direction = Direction.DOWN
+        if next_action == 4:
+            self.direction = Direction.LEFT
 
         return self.direction

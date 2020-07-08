@@ -5,6 +5,7 @@ from tron.map import Map
 from tron.game import Game, PositionPlayer
 from tron.window import Window
 from tron.player import Direction, KeyboardPlayer, Mode
+from tron.player import RandomPlayer
 from ais.basic.ai import Ai as AiBasic
 from ais.survivor.ai import Ai as Aisurvivor
 import random
@@ -59,7 +60,7 @@ def main():
 
 		game = Game(width, height, [
 			PositionPlayer(1, AiBasic(False), [x1,y1]),
-			PositionPlayer(2, Aisurvivor(False), [x2,y2]),
+			PositionPlayer(2, RandomPlayer(), [x2,y2]),
 		])
 
 		pygame.mouse.set_visible(False)
