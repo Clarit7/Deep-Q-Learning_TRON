@@ -60,7 +60,7 @@ def main():
 
 		game = Game(width, height, [
 			PositionPlayer(1, AiBasic(False), [x1,y1]),
-			PositionPlayer(2, RandomPlayer(), [x2,y2]),
+			PositionPlayer(2, RandomPlayer(Mode.STRAIGHT), [x2,y2]),
 		])
 
 		pygame.mouse.set_visible(False)

@@ -47,9 +47,13 @@ class Player(object):
 
 class Mode(Enum):
 
+    # for KeyboardPlayer
     ARROWS = 1
     ZQSD = 2
 
+    # for RandomPlayer
+    PURE = 3
+    STRAIGHT = 4
 
 class KeyboardPlayer(Player):
 
@@ -99,9 +103,10 @@ class KeyboardPlayer(Player):
 
 class RandomPlayer(Player):
 
-    def __init__(self):
+    def __init__(self, mode = Mode.PURE):
         super(RandomPlayer, self).__init__()
         self.direction = None
+        self.mode = mode
 
     def action(self, map, id):
         game_map = map.state_for_player(id)
@@ -127,6 +132,9 @@ class RandomPlayer(Player):
         if not all_blocked:
             while (blocked[next_action - 1] == 1):
                 next_action = random.randint(1, 4)
+
+            if self.direction is not None and blocked[self.direction.value - 1] == 0 and self.mode == Mode.STRAIGHT:
+                next_action = self.direction
 
         if next_action == 1:
             self.direction = Direction.UP
