@@ -21,7 +21,7 @@ class TreeNode(object):
         return self.search(child for child in self.children if not self.is_leaf())
 
     def expand(self, i):
-        self.children.append(TreeNode(None, 0, i+1))
+        self.children.append(TreeNode(self, 0, i+1))
 
     def get_value(self):
         return self.value
@@ -31,8 +31,12 @@ class Minimax(object):
         self.root = TreeNode(None, 0, 0)
         self.depth = depth
 
-    def get_blocked(self, game_map):
-        ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+    def get_blocked(self, game_map, depth_even_odd):
+        if depth_even_odd == 1:
+            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+        else:
+            ind = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
+
         blocked = np.zeros(4)
 
         if game_map[ind[0], ind[1] - 1] != 1:
@@ -55,10 +59,13 @@ class Minimax(object):
     def minimax_search(self, node, game_map, depth):
         if depth == 0:
             node.value = 1
-
             return 1
 
-        blocked, all_blocked = self.get_blocked(game_map)
+        depth_even_odd = 1 - 2 * (depth % 2)
+        blocked, all_blocked = self.get_blocked(game_map, depth_even_odd)
+
+        if all_blocked:
+            return 1
 
         if len(node.children) == 0:
             for i in range(4):
@@ -66,30 +73,38 @@ class Minimax(object):
                     node.expand(i)
 
         for child in node.children:
-            next_map = self.get_next_map(game_map, child.action)
+            next_map = self.get_next_map(game_map, child.action, depth_even_odd)
             self.minimax_search(child, next_map, depth-1)
 
-        max_value = max(child.get_value() for child in node.children)
-        max_acts = [child.action for child in node.children if child.get_value() == max_value]
+        if depth_even_odd == 1:
+            max_value = max(child.get_value() for child in node.children)
+            max_acts = [child.action for child in node.children if child.get_value() == max_value]
+            return random.choice(max_acts)
+        else:
+            min_value = min(child.get_value() for child in node.children)
+            min_acts = [child.action for child in node.children if child.get_value() == min_value]
+            return random.choice(min_acts)
 
-        return random.choice(max_acts)
+    def get_next_map(self, game_map, action, depth_even_odd):
+        game_map_copy = np.copy(game_map)
 
-
-    def get_next_map(self, game_map, action):
-        ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+        if depth_even_odd == 1:
+            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+        else:
+            ind = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
 
         if action == 1:
-            game_map[ind[0], ind[1] - 1] = 10
+            game_map_copy[ind[0], ind[1] - 1] = 10 * depth_even_odd
         if action == 2:
-            game_map[ind[0] + 1, ind[1]] = 10
+            game_map_copy[ind[0] + 1, ind[1]] = 10 * depth_even_odd
         if action == 3:
-            game_map[ind[0], ind[1] + 1] = 10
+            game_map_copy[ind[0], ind[1] + 1] = 10 * depth_even_odd
         if action == 4:
-            game_map[ind[0] - 1, ind[1]] = 10
+            game_map_copy[ind[0] - 1, ind[1]] = 10 * depth_even_odd
 
-        game_map[ind[0], ind[1]] = -1
+        game_map_copy[ind[0], ind[1]] = -1
 
-        return game_map
+        return game_map_copy
 
     def get_move(self, game_map):
         return self.minimax_search(self.root, game_map, self.depth)
