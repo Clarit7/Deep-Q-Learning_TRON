@@ -1,8 +1,8 @@
 from tron.player import Player, Direction
 import numpy as np
-import math
+import queue
 import random
-
+from orderedset import OrderedSet
 
 class TreeNode(object):
     def __init__(self, parent, value, action):
@@ -43,10 +43,98 @@ class TreeNode(object):
         self._minimax_action = minimax_action
 
 
+class SetQueue(queue.Queue):
+    def _init(self, maxsize):
+        self.queue = OrderedSet()
+
+    def _put(self, item):
+        self.queue.add(item)
+
+    def _get(self):
+        head = self.queue.__getitem__(0)
+        self.queue.remove(head)
+        return head
+
+
 class Minimax(object):
     def __init__(self, depth):
         self.root = TreeNode(None, 0, 0)
         self.depth = depth
+
+    def get_shortest_path(self, game_map, ind):
+        path_queue = SetQueue()
+        dist_map = np.copy(game_map)
+        path_queue._put((ind[0], ind[1], 1))
+
+        while not path_queue.empty():
+            queue_elem = path_queue._get()
+            x = queue_elem[0]
+            y = queue_elem[1]
+            l = queue_elem[2]
+
+            dist_map[x, y] = l+1
+
+            if dist_map[x, y - 1] == 1:
+                path_queue._put((x, y - 1, l + 1))
+            if dist_map[x + 1, y] == 1:
+                path_queue._put((x + 1, y, l + 1))
+            if dist_map[x, y + 1] == 1:
+                path_queue._put((x, y + 1, l + 1))
+            if dist_map[x - 1, y] == 1:
+                path_queue._put((x - 1, y, l + 1))
+
+        return dist_map
+
+    def get_voronoi_value(self, game_map, ):
+        pass
+
+    # game_map : numpy.array(12, 12)
+    def distance_walls(self, game_map, depth_even_odd):
+        if depth_even_odd == 1:
+            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+        else:
+            ind = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
+
+        head_crash = 0
+
+        up = 1
+        while game_map[ind[0], ind[1] - up] == 1:
+            up += 1
+
+        right = 1
+        while game_map[ind[0] + right, ind[1]] == 1:
+            right += 1
+
+        down = 1
+        while game_map[ind[0], ind[1] + down] == 1:
+            down += 1
+
+        left = 1
+        while game_map[ind[0] - left, ind[1]] == 1:
+            left += 1
+
+        return up + right+ down + left
+
+    def get_next_map(self, game_map, action, depth_even_odd):
+        game_map_copy = np.copy(game_map)
+
+        if depth_even_odd == 1:
+            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+        else:
+            ind = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
+
+        if action == 1:
+            game_map_copy[ind[0], ind[1] - 1] = 10 * depth_even_odd
+        if action == 2:
+            game_map_copy[ind[0] + 1, ind[1]] = 10 * depth_even_odd
+        if action == 3:
+            game_map_copy[ind[0], ind[1] + 1] = 10 * depth_even_odd
+        if action == 4:
+            game_map_copy[ind[0] - 1, ind[1]] = 10 * depth_even_odd
+
+        game_map_copy[ind] = -1
+
+        return game_map_copy
 
     def get_blocked(self, game_map, depth_even_odd):
         if depth_even_odd == 1:
@@ -85,39 +173,25 @@ class Minimax(object):
 
         return blocked, all_blocked
 
-    # game_map : numpy.array(12, 12)
-    def distance_walls(self, game_map, depth_even_odd):
-        if depth_even_odd == 1:
-            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+    """
+    def update_with_move(self, last_move):
+        if last_move in (child.get_action() for child in self.root._children):
+            self.root = self.root._children[last_move]
+            self.root._parent = None
         else:
-            ind = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
+            self.root = TreeNode(None, 0, 0)
+    """
 
-        head_crash = 0
-
-        up = 1
-        while game_map[ind[0], ind[1] - up] == 1:
-            up += 1
-
-        right = 1
-        while game_map[ind[0] + right, ind[1]] == 1:
-            right += 1
-
-        down = 1
-        while game_map[ind[0], ind[1] + down] == 1:
-            down += 1
-
-        left = 1
-        while game_map[ind[0] - left, ind[1]] == 1:
-            left += 1
-
-        return up + right+ down + left
-
+    def get_move(self, game_map):
+        return self.minimax_search(self.root, game_map, self.depth)
 
     def minimax_search(self, node, game_map, depth, crash = False):
         if crash:
             node.set_value(0)
 
         if depth == 0:
+            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+            self.get_shortest_path(game_map, ind)
             cur_player_dist = self.distance_walls(game_map, 1)
             opp_player_dist = self.distance_walls(game_map, -1)
             node.set_value(cur_player_dist - opp_player_dist)  # To do: voronoi diagram implementation
@@ -127,7 +201,7 @@ class Minimax(object):
         blocked, all_blocked = self.get_blocked(game_map, depth_even_odd)
 
         if all_blocked:
-            return 0
+            return random.randint(1, 4)
 
         crash_act = 0
         if node.is_leaf():
@@ -160,37 +234,6 @@ class Minimax(object):
 
         return node.get_minimax_action()
 
-    def get_next_map(self, game_map, action, depth_even_odd):
-        game_map_copy = np.copy(game_map)
-
-        if depth_even_odd == 1:
-            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
-        else:
-            ind = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
-
-        if action == 1:
-            game_map_copy[ind[0], ind[1] - 1] = 10 * depth_even_odd
-        if action == 2:
-            game_map_copy[ind[0] + 1, ind[1]] = 10 * depth_even_odd
-        if action == 3:
-            game_map_copy[ind[0], ind[1] + 1] = 10 * depth_even_odd
-        if action == 4:
-            game_map_copy[ind[0] - 1, ind[1]] = 10 * depth_even_odd
-
-        game_map_copy[ind] = -1
-
-        return game_map_copy
-
-    def get_move(self, game_map):
-        return self.minimax_search(self.root, game_map, self.depth)
-
-    def update_with_move(self, last_move):
-        if last_move in (child.get_action() for child in self.root._children):
-            self.root = self.root._children[last_move]
-            self.root._parent = None
-        else:
-            self.root = TreeNode(None, 0, 0)
-
     def __str__(self):
         return "Minimax"
 
@@ -211,9 +254,6 @@ class MinimaxPlayer(Player):
         game_map = map.state_for_player(id)
         next_action = self.minimax.get_move(game_map)
 
-        if next_action not in [1, 2, 3, 4]:
-            next_action = random.randint(1, 4)
-            
         if next_action == 1:
             next_direction = Direction.UP
         elif next_action == 2:
