@@ -61,10 +61,10 @@ class Minimax(object):
         self.root = TreeNode(None, 0, 0)
         self.depth = depth
 
-    def get_shortest_path(self, game_map, ind):
+    def get_shortest_path(self, game_map, ind, pl_mi):
         path_queue = SetQueue()
         dist_map = np.copy(game_map)
-        path_queue._put((ind[0], ind[1], 1))
+        path_queue._put((ind[0], ind[1], pl_mi))
 
         while not path_queue.empty():
             queue_elem = path_queue._get()
@@ -72,29 +72,59 @@ class Minimax(object):
             y = queue_elem[1]
             l = queue_elem[2]
 
-            dist_map[x, y] = l+1
+            dist_map[x, y] = l+pl_mi
 
             if dist_map[x, y - 1] == 1:
-                path_queue._put((x, y - 1, l + 1))
+                path_queue._put((x, y - 1, l + pl_mi))
             if dist_map[x + 1, y] == 1:
-                path_queue._put((x + 1, y, l + 1))
+                path_queue._put((x + 1, y, l + pl_mi))
             if dist_map[x, y + 1] == 1:
-                path_queue._put((x, y + 1, l + 1))
+                path_queue._put((x, y + 1, l + pl_mi))
             if dist_map[x - 1, y] == 1:
-                path_queue._put((x - 1, y, l + 1))
+                path_queue._put((x - 1, y, l + pl_mi))
 
         return dist_map
 
-    def get_voronoi_value(self, game_map, ):
-        pass
+    def get_voronoi_value(self, game_map, ind1, ind2):
+        p1_map = self.get_shortest_path(game_map, ind1, 1)
+        p2_map = self.get_shortest_path(game_map, ind2, -1)
+
+        p1_area = 0
+        p2_area = 0
+
+        """ visual map (doesn't necessary)
+        for i in range(p1_map.shape[0]):
+            for j in range(p2_map.shape[1]):
+                if p2_map[i, j] == -2:
+                    p1_map[i, j] = -10
+                elif p1_map[i, j] == 2:
+                    p1_map[i, j] = 10
+                elif p1_map[i, j] != -1:
+                    if p1_map[i, j] + p2_map[i, j] == 0:
+                        p1_map[i, j] = 0
+                    elif p1_map[i, j] + p2_map[i, j] > 0:
+                        p1_map[i, j] = -5
+                    else:
+                        p1_map[i, j] = 5
+        """
+
+        for i in range(p1_map.shape[0]):
+            for j in range(p2_map.shape[1]):
+                if not p1_map[i, j] == -1 and not p1_map[i, j] == 2 and not p2_map[i, j] == -2:
+                    if p1_map[i, j] != 1 and p2_map[i, j] == 1:
+                        p1_area += 1
+                    elif p1_map[i, j] == 1 and p2_map[i, j] != 1:
+                        p2_area += 1
+                    elif p1_map[i, j] + p2_map[i, j] < 0:
+                        p1_area += 1
+                    elif p1_map[i, j] + p2_map[i, j] > 0:
+                        p2_area += 1
+
+        return p1_area - p2_area
+
 
     # game_map : numpy.array(12, 12)
-    def distance_walls(self, game_map, depth_even_odd):
-        if depth_even_odd == 1:
-            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
-        else:
-            ind = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
-
+    def distance_walls(self, game_map, ind):
         head_crash = 0
 
         up = 1
@@ -190,11 +220,12 @@ class Minimax(object):
             node.set_value(0)
 
         if depth == 0:
-            ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
-            self.get_shortest_path(game_map, ind)
-            cur_player_dist = self.distance_walls(game_map, 1)
-            opp_player_dist = self.distance_walls(game_map, -1)
-            node.set_value(cur_player_dist - opp_player_dist)  # To do: voronoi diagram implementation
+            ind1 = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+            ind2 = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
+            node.set_value(self.get_voronoi_value(game_map, ind1, ind2))
+            cur_player_dist = self.distance_walls(game_map, ind1)
+            opp_player_dist = self.distance_walls(game_map, ind2)
+            # node.set_value(cur_player_dist - opp_player_dist)  # To do: voronoi diagram implementation
             return 0
 
         depth_even_odd = 1 - 2 * (depth % 2)
