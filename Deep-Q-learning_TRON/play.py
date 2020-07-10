@@ -4,9 +4,8 @@ import pygame
 from tron.map import Map
 from tron.game import Game, PositionPlayer
 from tron.window import Window
-from tron.player import Direction, KeyboardPlayer, Mode
-from tron.player import RandomPlayer
-from tron.minimax import MinimaxPlayer
+from tron.player import Direction, KeyboardPlayer, RandomPlayer, Mode
+from tron.minimax import MinimaxPlayer, Mode
 from ais.basic.ai import Ai as AiBasic
 from ais.survivor.ai import Ai as Aisurvivor
 import random
@@ -61,7 +60,7 @@ def main():
 
 		game = Game(width, height, [
 			PositionPlayer(1, AiBasic(False), [x1,y1]),
-			PositionPlayer(2, MinimaxPlayer(4), [x2,y2]),
+			PositionPlayer(2, MinimaxPlayer(4, Mode.VORNOI), [x2,y2]),
 		])
 
 		pygame.mouse.set_visible(False)

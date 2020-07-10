@@ -17,6 +17,7 @@ from tron.constant import *
 from ais.basic.ai import Ai as BasicAi
 from ais.survivor.ai import Ai as SurvivorAi
 from tron.player import RandomPlayer
+from tron.minimax import MinimaxPlayer
 
 # General parameters
 folderName = 'basic'
@@ -35,8 +36,8 @@ MAP_HEIGHT = GameSize
 # Cycle parameters
 GAME_CYCLE = 20
 DISPLAY_CYCLE = GAME_CYCLE
-TEST_CYCLE = 100
-PLAY_PER_TEST = 50
+TEST_CYCLE = 2000
+PLAY_PER_TEST = 100
 
 writer = SummaryWriter()
 
@@ -47,10 +48,40 @@ def train():
 	move_counter = 0
 
 	player_1 = BasicAi()
-	player_2 = RandomPlayer()
+	player_2 = MinimaxPlayer(2)
 
 	# Start training
 	while True:
+		# test winning rate
+		if (game_counter % TEST_CYCLE) == 0:
+			test_player_1 = BasicAi(False)
+			test_player_2 = MinimaxPlayer(2)
+
+			win_loss_draw = [0, 0, 0]
+
+			for i in range(PLAY_PER_TEST):
+				x1 = random.randint(0, MAP_WIDTH - 1)
+				y1 = random.randint(0, MAP_HEIGHT - 1)
+				x2 = random.randint(0, MAP_WIDTH - 1)
+				y2 = random.randint(0, MAP_HEIGHT - 1)
+				while x1 == x2 and y1 == y2:
+					x1 = random.randint(0, MAP_WIDTH - 1)
+					y1 = random.randint(0, MAP_HEIGHT - 1)
+
+				game = Game(MAP_WIDTH, MAP_HEIGHT, [
+					PositionPlayer(1, test_player_1, [x1, y1]),
+					PositionPlayer(2, test_player_2, [x2, y2]), ])
+
+				# Run the game
+				if TrainVisibleScreen:
+					window = Window(game, 40)
+					game.main_loop(window)
+				else:
+					game.main_loop()
+
+				win_loss_draw[analyzeGameResult(game)] += 1
+				writer.add_scalar("Player 1 win rate/train", float(win_loss_draw[0]) / float(PLAY_PER_TEST), game_counter)
+				writer.add_scalar("Player 1 draw rate/train", float(win_loss_draw[2]) / float(PLAY_PER_TEST), game_counter)
 
 		# Initialize the game cycle parameters
 		cycle_step = 0
@@ -91,7 +122,6 @@ def train():
 		player_1.save_model()
 		# player_2.save_model()
 
-
 		# Display results
 		if (game_counter%DISPLAY_CYCLE)==0:
 			loss_string = str(basic_loss)
@@ -107,38 +137,6 @@ def train():
 			with open('ais/' + folderName + '/data.txt', 'a') as myfile:
 				myfile.write(str(game_counter) + ', ' + str(float(move_counter)/float(DISPLAY_CYCLE)) + ', ' + loss_value + '\n')
 			move_counter = 0
-
-		# test winning rate
-		if (game_counter % TEST_CYCLE)==0:
-			test_player_1 = BasicAi(False)
-			test_player_2 = RandomPlayer()
-
-			win_loss_draw = [0, 0, 0]
-
-			for i in range(PLAY_PER_TEST):
-				x1 = random.randint(0, MAP_WIDTH - 1)
-				y1 = random.randint(0, MAP_HEIGHT - 1)
-				x2 = random.randint(0, MAP_WIDTH - 1)
-				y2 = random.randint(0, MAP_HEIGHT - 1)
-				while x1 == x2 and y1 == y2:
-					x1 = random.randint(0, MAP_WIDTH - 1)
-					y1 = random.randint(0, MAP_HEIGHT - 1)
-
-				game = Game(MAP_WIDTH, MAP_HEIGHT, [
-					PositionPlayer(1, player_1, [x1, y1]),
-					PositionPlayer(2, player_2, [x2, y2]), ])
-
-				# Run the game
-				if TrainVisibleScreen:
-					window = Window(game, 40)
-					game.main_loop(window)
-				else:
-					game.main_loop()
-
-				win_loss_draw[analyzeGameResult(game)] += 1
-
-			writer.add_scalar("Player 1 win rate/train", float(win_loss_draw[0])/float(PLAY_PER_TEST), game_counter)
-			writer.add_scalar("Player 1 draw rate/train", float(win_loss_draw[2])/float(PLAY_PER_TEST), game_counter)
 
 
 def analyzeGameResult(game):

@@ -1,25 +1,24 @@
 from tron.player import Player, Direction
+from orderedset import OrderedSet
+from enum import Enum
 import numpy as np
 import queue
 import random
-from orderedset import OrderedSet
+
 
 class TreeNode(object):
     def __init__(self, parent, value, action):
         self._parent = parent
-        self._children = []  # a map from action to TreeNode
+        self._children = []
         self._value = value
-        self._action = action
-        self._minimax_action = 0
+        self._action = action     # from parent which action played
+        self._minimax_action = 0  # which is the best action from this state
 
     def is_leaf(self):
         return self._children == []
 
     def is_root(self):
         return self._parent is None
-
-    def search(self):
-        return self.search(child for child in self._children if not self.is_leaf())
 
     def expand(self, i):
         self._children.append(TreeNode(self, 0, i+1))
@@ -57,9 +56,10 @@ class SetQueue(queue.Queue):
 
 
 class Minimax(object):
-    def __init__(self, depth):
+    def __init__(self, depth, mode):
         self.root = TreeNode(None, 0, 0)
         self.depth = depth
+        self.mode = mode
 
     def get_shortest_path(self, game_map, ind, pl_mi):
         path_queue = SetQueue()
@@ -121,7 +121,6 @@ class Minimax(object):
                         p2_area += 1
 
         return p1_area - p2_area
-
 
     # game_map : numpy.array(12, 12)
     def distance_walls(self, game_map, ind):
@@ -212,23 +211,23 @@ class Minimax(object):
             self.root = TreeNode(None, 0, 0)
     """
 
-    def get_move(self, game_map):
-        return self.minimax_search(self.root, game_map, self.depth)
-
     def minimax_search(self, node, game_map, depth, crash = False):
-        if crash:
+        if crash:  # head vs head crashing state
             node.set_value(0)
 
         if depth == 0:
             ind1 = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
             ind2 = np.unravel_index(np.argmin(game_map, axis=None), game_map.shape)
-            node.set_value(self.get_voronoi_value(game_map, ind1, ind2))
-            cur_player_dist = self.distance_walls(game_map, ind1)
-            opp_player_dist = self.distance_walls(game_map, ind2)
-            # node.set_value(cur_player_dist - opp_player_dist)  # To do: voronoi diagram implementation
-            return 0
+            if self.mode == Mode.DISTWALL:
+                cur_player_dist = self.distance_walls(game_map, ind1)
+                opp_player_dist = self.distance_walls(game_map, ind2)
+                node.set_value(cur_player_dist - opp_player_dist)
+            else:  # Mode.VORONOI
+                node.set_value(self.get_voronoi_value(game_map, ind1, ind2))
 
-        depth_even_odd = 1 - 2 * (depth % 2)
+            return 0  # for exit 1 recursion step
+
+        depth_even_odd = 1 - 2 * (depth % 2)  # even depth: 1, odd depth: -1
         blocked, all_blocked = self.get_blocked(game_map, depth_even_odd)
 
         if all_blocked:
@@ -243,13 +242,20 @@ class Minimax(object):
                     node.expand(i)
                     crash_act = i + 1
 
-        # To do: alpha-beta pruning
         for child in node._children:
             next_map = self.get_next_map(game_map, child.get_action(), depth_even_odd)
             if child.get_action() == crash_act:
                 self.minimax_search(child, next_map, depth-1, crash = True)
             else:
                 self.minimax_search(child, next_map, depth-1)
+
+            # alpha-beta pruning
+            if depth_even_odd == -1 and node._parent.get_minimax_action() != 0:
+                if child.get_value() <= node._parent.get_value():
+                    node.set_value(child.get_value())
+                    node.set_minimax_action(child.get_action())
+
+                    return 0  # for exit 1 recursion step
 
         if depth_even_odd == 1:
             minimax_value = max(child.get_value() for child in node._children)
@@ -260,25 +266,32 @@ class Minimax(object):
         minimax_acts = [child.get_action() for child in node._children if child.get_value() == minimax_value]
         node.set_minimax_action(random.choice(minimax_acts))
 
-        if node.get_minimax_action() not in [1, 2, 3, 4]:
-            print("error")
-
         return node.get_minimax_action()
+
+    def get_move(self, game_map):
+        return self.minimax_search(self.root, game_map, self.depth)
 
     def __str__(self):
         return "Minimax"
 
 
+class Mode(Enum):
+
+    DISTWALL = 1
+    VORNOI = 2
+
+
 class MinimaxPlayer(Player):
 
-    def __init__(self, depth):
+    def __init__(self, depth, mode = Mode.VORNOI):
         super(MinimaxPlayer, self).__init__()
-        self.minimax = Minimax(depth)
+        self.mode = mode
+        self.minimax = Minimax(depth, mode)
         self.direction = None
         self.depth = depth
 
     def initialize_minimax(self):
-        self.minimax = Minimax(self.depth)
+        self.minimax = Minimax(self.depth, self.mode)
 
     def action(self, map, id):
         self.initialize_minimax()
