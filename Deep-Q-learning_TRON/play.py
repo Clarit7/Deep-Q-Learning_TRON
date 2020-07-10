@@ -61,7 +61,7 @@ def main():
 
 		game = Game(width, height, [
 			PositionPlayer(1, AiBasic(False), [x1,y1]),
-			PositionPlayer(2, MinimaxPlayer(2), [x2,y2]),
+			PositionPlayer(2, MinimaxPlayer(4), [x2,y2]),
 		])
 
 		pygame.mouse.set_visible(False)
