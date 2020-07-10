@@ -6,26 +6,41 @@ import random
 
 class TreeNode(object):
     def __init__(self, parent, value, action):
-        self.parent = parent
-        self.children = []  # a map from action to TreeNode
-        self.value = value
-        self.action = action
+        self._parent = parent
+        self._children = []  # a map from action to TreeNode
+        self._value = value
+        self._action = action
+        self._minimax_action = 0
 
     def is_leaf(self):
-        return self.children == []
+        return self._children == []
 
     def is_root(self):
-        return self.parent is None
+        return self._parent is None
 
     def search(self):
-        return self.search(child for child in self.children if not self.is_leaf())
+        return self.search(child for child in self._children if not self.is_leaf())
 
     def expand(self, i):
-        self.children.append(TreeNode(self, 0, i+1))
+        self._children.append(TreeNode(self, 0, i+1))
 
     def get_value(self):
-        return self.value
+        return self._value
 
+    def set_value(self, value):
+        self._value = value
+
+    def get_action(self):
+        return self._action
+
+    def set_action(self, action):
+        self._action
+
+    def get_minimax_action(self):
+        return self._minimax_action
+
+    def set_minimax_action(self, minimax_action):
+        self._minimax_action = minimax_action
 class Minimax(object):
     def __init__(self, depth):
         self.root = TreeNode(None, 0, 0)
@@ -57,33 +72,37 @@ class Minimax(object):
         return blocked, all_blocked
 
     def minimax_search(self, node, game_map, depth):
+        node.set_minimax_action(node.get_action())
+
         if depth == 0:
-            node.value = 1
-            return 1
+            node.set_value(1)  # To do: voronoi diagram implementation
+            return node.get_minimax_action()
 
         depth_even_odd = 1 - 2 * (depth % 2)
         blocked, all_blocked = self.get_blocked(game_map, depth_even_odd)
 
         if all_blocked:
-            return 1
+            return node.get_minimax_action()
 
-        if len(node.children) == 0:
+        if node.is_leaf():
             for i in range(4):
                 if blocked[i] == 0:
                     node.expand(i)
 
-        for child in node.children:
-            next_map = self.get_next_map(game_map, child.action, depth_even_odd)
+        # To do: alpha-beta pruning
+        for child in node._children:
+            next_map = self.get_next_map(game_map, child.get_action(), depth_even_odd)
             self.minimax_search(child, next_map, depth-1)
 
         if depth_even_odd == 1:
-            max_value = max(child.get_value() for child in node.children)
-            max_acts = [child.action for child in node.children if child.get_value() == max_value]
-            return random.choice(max_acts)
+            minimax_value = max(child.get_value() for child in node._children)
         else:
-            min_value = min(child.get_value() for child in node.children)
-            min_acts = [child.action for child in node.children if child.get_value() == min_value]
-            return random.choice(min_acts)
+            minimax_value = min(child.get_value() for child in node._children)
+
+        minimax_acts = [child.get_action() for child in node._children if child.get_value() == minimax_value]
+        node.set_minimax_action(random.choice(minimax_acts))
+
+        return node.get_minimax_action()
 
     def get_next_map(self, game_map, action, depth_even_odd):
         game_map_copy = np.copy(game_map)
@@ -117,7 +136,7 @@ class Minimax(object):
             self._root = TreeNode(None, 0)
 
     def __str__(self):
-        return "MCTS"
+        return "Minimax"
 
 
 class MinimaxPlayer(Player):
