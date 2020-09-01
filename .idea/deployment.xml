@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="jaylee@210.115.46.57:3300 key" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="Jay">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/Programming/Tron/Deep-Q-learning_TRON" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="jaylee@210.115.46.57:3300 key">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_543" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>
