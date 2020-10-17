@@ -2,7 +2,6 @@ from time import sleep
 from enum import Enum
 
 from tron.map import Map, Tile
-from tron.constant import *
 
 class Winner(Enum):
     PLAYER_ONE = 1
@@ -61,6 +60,7 @@ class Game:
 
         map_clone = self.map()
 
+
         for pp in self.pps:
             map_clone[pp.position[0], pp.position[1]] = pp.body()
 
@@ -77,6 +77,8 @@ class Game:
 
         self.history[-1].player_one_direction = self.pps[0].player.direction
         self.history[-1].player_two_direction = self.pps[1].player.direction
+        #print("1",self.history[-1].player_one_direction )
+        #print("2",self.history[-1].player_two_direction)
 
         if window:
             import pygame
@@ -97,7 +99,7 @@ class Game:
                         return False
 
         for (id, pp) in enumerate(self.pps):
-
+           # print(id,"",pp.position)
             if pp.position[0] < 0 or pp.position[1] < 0 or \
                pp.position[0] >= self.width or pp.position[1] >= self.height:
 
@@ -125,7 +127,7 @@ class Game:
             alive = None
 
             if window:
-                sleep(GameSpeed)
+                sleep(0.3)
 				#sleep(0.5)
 
             if not self.next_frame(window):

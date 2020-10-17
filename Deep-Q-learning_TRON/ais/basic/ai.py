@@ -11,7 +11,6 @@ import numpy as np
 import random
 
 import os
-from tron.constant import *
 
 # General parameters
 folderName = 'basic'
@@ -28,13 +27,13 @@ class Net(nn.Module):
 		self.gamma = GAMMA
 		self.conv1 = nn.Conv2d(1, 32, 6)
 		self.conv2 = nn.Conv2d(32, 64, 3)
-		self.fc1 = nn.Linear(64*(GameSize - 5)*(GameSize - 5), 512)
+		self.fc1 = nn.Linear(64*5*5, 512)
 		self.fc2 = nn.Linear(512, 4)
 
 	def forward(self, x):
 		x = F.relu(self.conv1(x))
 		x = F.relu(self.conv2(x))
-		x = x.view(-1, 64*(GameSize - 5)*(GameSize - 5))
+		x = x.view(-1, 64*5*5)
 		x = F.relu(self.fc1(x))
 		x = self.fc2(x)
 		return x
@@ -47,8 +46,13 @@ class Ai(Player):
 		self.net = Net()
 		self.epsilon = epsilon
 		# Load network weights if they have been initialized already
-		if os.path.isfile('ais/' + folderName + '/' + str(GameSize) + '_ai.bak'):
-			self.net.load_state_dict(torch.load('ais/' + folderName + '/' + str(GameSize) + '_ai.bak'))
+		if os.path.isfile('ais/' + folderName + '/ai.bak'):
+			self.net.load_state_dict(torch.load('ais/' + folderName + '/ai.bak'))
+			#print("load reussi 1 ")
+			
+		elif os.path.isfile(self.find_file('ai.bak')):
+			self.net.load_state_dict(torch.load(self.find_file('ai.bak')))
+			#print("load reussi 2 ")
 
 	def action(self, map, id):
 

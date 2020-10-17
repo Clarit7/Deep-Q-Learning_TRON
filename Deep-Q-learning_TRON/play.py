@@ -7,8 +7,10 @@ from tron.window import Window
 from tron.player import Direction, KeyboardPlayer, Mode
 from ais.basic.ai import Ai as AiBasic
 from ais.survivor.ai import Ai as Aisurvivor
+from tron.minimax import MinimaxPlayer
+
+
 import random
-from tron.constant import *
 
 def randomPosition(width, height):
 
@@ -47,10 +49,9 @@ def printGameResults(game):
 def main():
 	pygame.init()
 
-	while(1):
-		width = GameSize
-		height = GameSize
-
+	width = 10
+	height = 10
+	while (True):
 		x1, y1 = randomPosition(width,height)
 		x2, y2 = randomPosition(width, height)
 
@@ -58,19 +59,16 @@ def main():
 			x1, y1 = randomPosition(width, height)
 
 		game = Game(width, height, [
-			PositionPlayer(1, AiBasic(), [x1,y1]),
-			PositionPlayer(2, Aisurvivor(), [x2,y2]),
-		])
+			PositionPlayer(1, MinimaxPlayer(2,'VORNOI'), [x1,y1]),
+  	      PositionPlayer(2,MinimaxPlayer(2, 'VORNOI'), [x2,y2]),
+ 	   ])
 
 		pygame.mouse.set_visible(False)
 
-		if VisibleScreen:
-			window = Window(game, 40)
-			# displayGameMenu(window, game)
-			game.main_loop(window)
-		else:
-			game.main_loop()
+		window = Window(game, 40)
+		#displayGameMenu(window, game)
 
+		game.main_loop(window)
 		printGameResults(game)
 
 if __name__ == '__main__':
