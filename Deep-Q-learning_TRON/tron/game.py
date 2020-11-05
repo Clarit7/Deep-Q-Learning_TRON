@@ -99,9 +99,8 @@ class Game:
                         return False
 
         for (id, pp) in enumerate(self.pps):
-           # print(id,"",pp.position)
-            if pp.position[0] < 0 or pp.position[1] < 0 or \
-               pp.position[0] >= self.width or pp.position[1] >= self.height:
+            # print(id,"",pp.position)
+            if pp.position[0] < 0 or pp.position[1] < 0 or pp.position[0] >= self.width or pp.position[1] >= self.height:
 
                 pp.alive = False
                 map_clone[pp.position[0], pp.position[1]] = pp.head()

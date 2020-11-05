@@ -307,4 +307,4 @@ class MinimaxPlayer(Player):
         elif next_action == 4:
             next_direction = Direction.LEFT
 
-        return next_action-1
+        return next_direction

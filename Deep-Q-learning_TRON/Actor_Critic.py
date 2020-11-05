@@ -8,8 +8,8 @@ from torch import optim
 import random
 import visdom
 
-from tron.DDQN_player import Player, Direction
-from tron.DDQN_game import Tile, Game, PositionPlayer
+from tron.AC_player import Player, Direction
+from tron.AC_game import Tile, Game, PositionPlayer
 
 from torch.utils.tensorboard import SummaryWriter
 from tron.minimax import MinimaxPlayer
@@ -168,7 +168,6 @@ class player(Player):
         super(player, self).__init__()
 
         """Initialize an Agent object.
-
                Params
                =======
                    state_size (int): dimension of each state
@@ -330,6 +329,7 @@ def train():
     entropy_sum1 = 0
     act_loss_sum1 = 0
 
+    """
     vis = visdom.Visdom()
     vis.close(env="main")
     # 동시 실행할 환경 수 만큼 env를 생성
@@ -338,7 +338,7 @@ def train():
     entropy_plot = vis.line(Y=torch.Tensor(1).zero_(),opts=dict(title='entropy_tracker', legend=['entropy'], showlegend=True))
     value_plot = vis.line(Y=torch.Tensor(1).zero_(), opts=dict(title='value_tracker', legend=['value'], showlegend=True))
     duration_plot = vis.line(Y=torch.Tensor(1).zero_(),opts=dict(title='duration', legend=['duration'], showlegend=True))
-
+    """
 
     envs = [make_game() for i in range(NUM_PROCESSES)]
 
@@ -451,11 +451,13 @@ def train():
                     if (i == 0):
                         if(gamecount%SHOW_ITER==0):
 
+                            """
                             vis.line(X=torch.tensor([gamecount]),
                                      Y=torch.tensor([duration/SHOW_ITER]),
                                      win=duration_plot,
                                      update='append'
                                      )
+                            """
                             duration=0
                         # print(reward_np1[i], "reward")
                         # print(each_step1[i], "step")
@@ -482,7 +484,6 @@ def train():
 
             # 각 실행 환경을 확인하여 done이 true이면 mask를 0으로, false이면 mask를 1로
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done_np])
-
 
             # current_obs를 업데이트
             obs1 = [pop_up(obs_np1[i]) for i in range(NUM_PROCESSES)]
@@ -549,6 +550,7 @@ def train():
             # print(act_loss_sum2/SHOW_ITER, ":act2")
             # print(entropy_sum2/SHOW_ITER, ":entropy2",end="\n\n")
 
+            """
             vis.line(X=torch.tensor([losscount]),
                      Y=torch.tensor([total_loss_sum1]),
                      win=total_loss_plot,
@@ -569,6 +571,8 @@ def train():
                      win=entropy_plot,
                      update='append'
                      )
+            """
+
             act_loss_sum1 =0
             entropy_sum1 =0
             val_loss_sum1 =0
@@ -591,4 +595,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

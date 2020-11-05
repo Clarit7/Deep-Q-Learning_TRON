@@ -51,6 +51,7 @@ def main():
 
 	width = 10
 	height = 10
+
 	while (True):
 		x1, y1 = randomPosition(width,height)
 		x2, y2 = randomPosition(width, height)
@@ -58,15 +59,13 @@ def main():
 		while x1==x2 and y1==y2:
 			x1, y1 = randomPosition(width, height)
 
-		game = Game(width, height, [
-			PositionPlayer(1, MinimaxPlayer(2,'VORNOI'), [x1,y1]),
-  	      PositionPlayer(2,MinimaxPlayer(2, 'VORNOI'), [x2,y2]),
- 	   ])
+		game = Game(width, height, [PositionPlayer(1, MinimaxPlayer(2, 'VORNOI'), [x1,y1]),
+									PositionPlayer(2, MinimaxPlayer(2, 'VORNOI'), [x2,y2])])
 
 		pygame.mouse.set_visible(False)
 
 		window = Window(game, 40)
-		#displayGameMenu(window, game)
+		# displayGameMenu(window, game)
 
 		game.main_loop(window)
 		printGameResults(game)
