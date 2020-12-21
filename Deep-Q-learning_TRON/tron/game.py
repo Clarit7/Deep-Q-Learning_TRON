@@ -4,6 +4,7 @@ from enum import Enum
 from tron.map import Map, Tile
 from tron.player import ACPlayer
 from orderedset import OrderedSet
+import torch
 
 import numpy as np
 import queue
@@ -139,7 +140,7 @@ class Game:
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
 
         if not done and self.check_separated(map_clone, self.pps[0]):
-            print("get longest path")
+            # print("get longest path")
             self.get_longest_path(map_clone, self.pps[0], self.pps[1])
 
         self.history.append(HistoryElement(map_clone, None, None))
@@ -201,12 +202,12 @@ class Game:
             alive = None
 
             if window:
-                sleep(0.1)
+                sleep(1.0)
             map=self.map()
 
 
-            action1=model.act( np.expand_dims(pop(map.state_for_player(1)), axis=0))
-            action2 = model.act( np.expand_dims(pop(map.state_for_player(2)), axis=0))
+            action1=model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
+            action2 = model.act( torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
 
             if not self.next_frame(action1,action2,window):
                 break

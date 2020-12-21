@@ -3,7 +3,7 @@ from tron.game import  Game, PositionPlayer
 
 from collections import namedtuple
 from torch.utils.tensorboard import SummaryWriter
-from Net.Net import Net
+from Net.DQNNet import Net
 
 import torch
 import torch.optim as optim
@@ -46,7 +46,6 @@ class Ai(Player):
 		# if os.path.isfile('ais/' + folderName  +'/'+ '_ai.bak'):
 		# 	self.net.load_state_dict(torch.load('ais/' + folderName +'/' + '_ai.bak'))
 
-
 	def action(self, map, id):
 
 		game_map = map.state_for_player(id)
@@ -72,7 +71,6 @@ class Ai(Player):
 			next_direction = Direction.LEFT
 
 		return next_direction
-
 
 Transition = namedtuple('Transition',('old_state', 'action', 'new_state', 'reward', 'terminal'))
 
