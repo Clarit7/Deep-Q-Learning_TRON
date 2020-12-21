@@ -1,9 +1,7 @@
-
 from enum import Enum
 
 
 class Direction(Enum):
-
     UP = 1
     RIGHT = 2
     DOWN = 3
@@ -16,55 +14,54 @@ class Player(object):
         pass
 
     def find_file(self, name):
-
-        return '/'.join(self.__module__.split('.')[:-1]) + '/' + name
+        pass
 
     def next_position(self, current_position, direction):
+        pass
 
-        if direction == Direction.UP:
-            return (current_position[0] - 1, current_position[1])
-        if direction == Direction.RIGHT:
-            return (current_position[0], current_position[1] + 1)
-        if direction == Direction.DOWN:
-            return (current_position[0] + 1, current_position[1])
-        if direction == Direction.LEFT:
-            return (current_position[0], current_position[1] - 1)
-
-    def next_position_and_direction(self, current_position, id, map):
-
-        direction = self.action(map, id)
-        return (self.next_position(current_position, direction), direction)
+    def get_direction(self, current_position, direction):
+        pass
+    def next_position_and_direction(self, current_position,action):
+        pass
 
     def action(self, map, id):
 
         pass
 
-    def manage_event(self, event):
+    def step(self, state, action, reward, next_step, done):
+        pass
 
+    def learn(self, experiences, gamma):
+        pass
+
+    def soft_update(self, local_model, target_model, tau):
+        pass
+
+    def manage_event(self, event):
         pass
 
 
-class Mode(Enum):
 
+class Mode(Enum):
     ARROWS = 1
     ZQSD = 2
 
 
 class KeyboardPlayer(Player):
 
-    def __init__(self, initial_direction, mode = Mode.ARROWS):
+    def __init__(self, initial_direction, mode=Mode.ARROWS):
 
         super(KeyboardPlayer, self).__init__()
         self.direction = initial_direction
         self.mode = mode
 
     def left(self):
- 
+
         import pygame
         return pygame.K_q if self.mode == Mode.ZQSD else pygame.K_LEFT
 
     def right(self):
-  
+
         import pygame
         return pygame.K_d if self.mode == Mode.ZQSD else pygame.K_RIGHT
 
@@ -94,3 +91,41 @@ class KeyboardPlayer(Player):
     def action(self, map, id):
 
         return self.direction
+
+class ACPlayer(Player):
+    def __init__(self):
+        super(ACPlayer, self).__init__()
+
+        """Initialize an Agent object.
+
+               Params
+               =======
+                   state_size (int): dimension of each state
+                   action_size (int): dimension of each action
+                   seed (int): random seed
+               """
+    def get_direction(self,next_action):
+        next_action=next_action+1
+        if next_action == 1:
+            next_direction = Direction.UP
+        if next_action == 2:
+            next_direction = Direction.RIGHT
+        if next_action == 3:
+            next_direction = Direction.DOWN
+        if next_action == 4:
+            next_direction = Direction.LEFT
+        return next_direction
+
+    def next_position_and_direction(self, current_position, action):
+        direction = self.get_direction(action)
+        return (self.next_position(current_position, direction), direction)
+
+    def next_position(self, current_position, direction):
+        if direction == Direction.UP:
+            return (current_position[0] - 1, current_position[1])
+        elif direction == Direction.RIGHT:
+            return (current_position[0], current_position[1] + 1)
+        elif direction == Direction.DOWN:
+            return (current_position[0] + 1, current_position[1])
+        elif direction == Direction.LEFT:
+            return (current_position[0], current_position[1] - 1)

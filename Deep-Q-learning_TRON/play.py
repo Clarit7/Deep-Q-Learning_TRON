@@ -1,17 +1,11 @@
 import pygame
-
-from object.DDQN_game import Game, PositionPlayer
 from tron.window import Window
-from object.DDQN_player import Direction, KeyboardPlayer, Mode, ACPlayer
-from ais.ACKTR import ai as ACKTR
-import torch
-import torch.nn as nn
-
-from tron.minimax import MinimaxPlayer
+from Net import Net
+from util import *
 
 import random
 
-folderName='ACKTR'
+folderName='/save'
 
 def randomPosition(width, height):
     x = random.randint(0, width - 1)
@@ -49,37 +43,18 @@ def printGameResults(game):
 def main():
     pygame.init()
 
-    width = 10
-    height = 10
-
-    model = ACKTR.Net().to('cuda')
-    model.load_state_dict(torch.load('ais/' + folderName + '/ACKTR_player.bak'),strict=False)
+    model = Net().to('cuda')
+    model.load_state_dict(torch.load(folderName + '/A2CPlayer.bak'),strict=False)
 
     while (True):
 
-
-        x1, y1 = randomPosition(width, height)
-        x2, y2 = randomPosition(width, height)
-
-        while x1 == x2 and y1 == y2:
-            x1, y1 = randomPosition(width, height)
-
-        # game = Game(width, height, [
-        #     PositionPlayer(1, MinimaxPlayer(2, 'voronoi'), [x1, y1]),
-        #     PositionPlayer(2, MinimaxPlayer(2, 'voronoi'), [x2, y2]),
-        # ])
-        game = Game(width, height, [
-            PositionPlayer(1,ACPlayer(), [x1, y1]),
-            PositionPlayer(2,ACPlayer(), [x2, y2]),
-        ])
-
-
+        game = make_game(True,True)
         pygame.mouse.set_visible(False)
 
         window = Window(game, 40)
         # displayGameMenu(window, game)
 
-        game.main_loop(model,window)
+        game.main_loop(model,pop_up,window)
         printGameResults(game)
 
 

@@ -1,16 +1,11 @@
-from tron.minimax import MinimaxPlayer
-from tron import resnet
-
 from collections import namedtuple,deque
 import os
-
-import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
+from tron.player import ACPlayer
 
 from util import *
-
+from Net import Net
 
 # General parameters
 folderName = 'survivor'
@@ -31,10 +26,6 @@ TAU = 0.001
 MAP_WIDTH = 10
 MAP_HEIGHT = 10
 
-# resnet
-conv1x1=resnet.conv1x1
-BasicBlock=resnet.BasicBlock
-
 
 # Memory parameters
 MEM_CAPACITY = int(1e5)
@@ -43,124 +34,6 @@ MEM_CAPACITY = int(1e5)
 UPDATE_EVERY = 4
 GAME_CYCLE = 20
 DISPLAY_CYCLE = GAME_CYCLE
-
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.batch_size = BATCH_SIZE
-        self.gamma = GAMMA
-        self.inplanes = 3
-        self.layers = 3
-
-        # self.conv1 = nn.Conv2d(1, 8, 5,padding=2)
-        # self.conv2 = nn.Conv2d(8, 32, 3,padding=1)
-        # self.conv3 = nn.Conv2d(32, 64, 3,padding=1)
-
-        # self.layer1 = self._make_layer(BasicBlock, 16, self.layers, stride=2)
-        # self.layer2 = self._make_layer(BasicBlock, 64, self.layers)
-        # self.layer3 = self._make_layer(BasicBlock, 128, self.layers)
-
-        #
-        # self.conv1 = nn.Conv2d(3, 16, 7, padding=3, stride=1)
-        # self.conv2 = nn.Conv2d(16, 64, 5, padding=1, stride=1)
-        # self.conv3 = nn.Conv2d(64, 128, 5)
-        # self.conv4 = nn.Conv2d(64, 256, 3, padding=1)
-
-        self.conv1 = nn.Conv2d(3, 32, 6)
-        self.conv2 = nn.Conv2d(32, 64, 3)
-
-        # self.fc1 = nn.Linear(128 * 2* 2, 256)
-        # self.fc2 = nn.Linear(256, 512)
-        # self.fc3 = nn.Linear(512, 256)
-        # self.fc4 = nn.Linear(256, 64)
-        # self.fc5 = nn.Linear(64, 4)
-
-        self.fc1 = nn.Linear(64 * 5* 5, 64)
-        # self.fc2 = nn.Linear(256, 64)
-        self.fc3 = nn.Linear(64, 4)
-
-        self.AvgPool = nn.AvgPool2d(kernel_size=3, stride=1)
-
-        self.dropout = nn.Dropout(p=0.3)
-
-        self.batch_norm = nn.BatchNorm2d(3)
-        # torch.nn.init.xavier_uniform_(self.fc1.weight)
-        # torch.nn.init.xavier_uniform_(self.fc2.weight)
-        # torch.nn.init.xavier_uniform_(self.fc3.weight)
-        # torch.nn.init.xavier_uniform_(self.fc4.weight)
-        # torch.nn.init.xavier_uniform_(self.fc5.weight)
-
-    def forward(self, x):
-        x = x.cuda()
-
-        # x = self.batch_norm(x)
-        #
-        # x = self.layer1(x)
-        # x = self.layer2(x)
-        # x = self.AvgPool(x)
-
-        # x = self.layer3(x)
-
-        #
-        # x = F.relu(self.conv1(x))
-        # x = F.relu(self.conv2(x))
-        # x = self.AvgPool(x)
-        # x = F.relu(self.conv3(x))
-        # x = self.AvgPool(x)
-        # x = F.relu(self.conv4(x))
-        # x = self.maxPool(x)
-
-        # x = x.view(-1, 128 * 2 * 2)
-        #
-        # x = self.fc1(x)
-        # x1 = self.dropout(F.relu(x))
-        # x1 += x
-
-        #
-        # x = self.fc2(x1)
-        # x2 = self.dropout(F.relu(x))
-        # x2+=x
-        #
-        # x = self.fc3(x2)
-        # x3 = self.dropout(F.relu(x))
-        # x3 += x
-
-        # x = self.fc4(x1)
-        # x4 = self.dropout(F.relu(x))
-        # x4 += x
-        #
-        # x = self.fc5(x4)
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = x.view(-1, 64 * 5 * 5)
-
-        x=self.dropout(F.relu(self.fc1(x)))
-        # x=self.dropout(F.relu(self.fc2(x)))
-        x=self.fc3(x)
-
-
-        return x
-
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride),
-                nn.BatchNorm2d(planes * block.expansion),
-            )
-
-        layers = []
-
-        layers.append(block(self.inplanes, planes, stride, downsample))
-
-        self.inplanes = planes * block.expansion
-
-        for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
-        return nn.Sequential(*layers)
-
 
 class Agent():
     def __init__(self):
@@ -186,6 +59,7 @@ class Agent():
         self.epsilon=0
         self.totalloss=0
         # Replay memory
+
         self.memory = ReplayBuffer(4, MEM_CAPACITY, BATCH_SIZE)
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
@@ -269,7 +143,6 @@ class Agent():
         # with torch.no_grad():
         #     labels_next = self.qnetwork_target(next_state).detach().max(1)[0].unsqueeze(1)
 
-        #print("?",labels_next)
         # .detach() ->  Returns a new Tensor, detached from the current graph.
 
         labels = rewards + (gamma * labels_next * (1 - dones))
@@ -296,47 +169,6 @@ class Agent():
         for target_param, local_param in zip(target_model.parameters(),
                                              local_model.parameters()):
             target_param.data.copy_(tau * local_param.data + (1 - tau) * target_param.data)
-
-class player(Player):
-    def __init__(self):
-        super(player, self).__init__()
-
-        """Initialize an Agent object.
-
-               Params
-               =======
-                   state_size (int): dimension of each state
-                   action_size (int): dimension of each action
-                   seed (int): random seed
-               """
-    def get_direction(self,next_action):
-
-        if next_action == 1:
-            next_direction = Direction.UP
-        if next_action == 2:
-            next_direction = Direction.RIGHT
-        if next_action == 3:
-            next_direction = Direction.DOWN
-        if next_action == 4:
-            next_direction = Direction.LEFT
-
-        return next_direction
-
-    def next_position_and_direction(self, current_position,action):
-
-        direction = self.get_direction(action)
-        return (self.next_position(current_position, direction),direction)
-
-    def next_position(self, current_position, direction):
-
-        if direction == Direction.UP:
-            return (current_position[0] - 1, current_position[1])
-        if direction == Direction.RIGHT:
-            return (current_position[0], current_position[1] + 1)
-        if direction == Direction.DOWN:
-            return (current_position[0] + 1, current_position[1])
-        if direction == Direction.LEFT:
-            return (current_position[0], current_position[1] - 1)
 
 class ReplayBuffer:
     """Fixed -size buffe to store experience tuples."""
@@ -409,6 +241,7 @@ def train():
     mini=False
     duel_mini=False
     start_mini=100000
+
 
 
 
@@ -625,12 +458,6 @@ def train():
 
 
 def main():
-    #model = Net().to(device)
-    local_model = Net()
-    target_model = Net()
-
-    # if os.path.isfile('ais/' + folderName + '/_ai.bak'):
-    #     local_model.load_state_dict(torch.load('ais/' + folderName + '/_ai.bak'))
     train()
 
 if __name__ == "__main__":

@@ -2,8 +2,9 @@ import numpy as np
 import random
 
 from config import *
-from object.DDQN_game import *
-from object.DDQN_player import *
+from tron.game import *
+from tron.minimax import MinimaxPlayer
+from tron.player import KeyboardPlayer,ACPlayer
 
 
 def pop_up(map):
@@ -34,7 +35,7 @@ def pop_up(map):
 
     return np.concatenate((wall,my,ener),axis=0)
 
-def make_game():
+def make_game(p1,p2):
     x1 = random.randint(0, MAP_WIDTH - 1)
     y1 = random.randint(0, MAP_HEIGHT - 1)
     x2 = random.randint(0, MAP_WIDTH - 1)
@@ -45,14 +46,8 @@ def make_game():
         y1 = random.randint(0, MAP_HEIGHT - 1)
     # Initialize the game
 
-    player1 = ACPlayer()
-    player2 = ACPlayer()
-    # player1 = MinimaxPlayer(2, "voronoi")
-    # player2 = MinimaxPlayer(2, "voronoi")
-
-    #
     game = Game(MAP_WIDTH, MAP_HEIGHT, [
-        PositionPlayer(1, player1, [x1, y1]),
-        PositionPlayer(2, player2, [x2, y2]), ])
+        PositionPlayer(1,  ACPlayer() if p1 else MinimaxPlayer(2, "voronoi"), [x1, y1]),
+        PositionPlayer(2,  ACPlayer() if p2 else MinimaxPlayer(2, "voronoi"), [x2, y2]), ])
 
     return game
