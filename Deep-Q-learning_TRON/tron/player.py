@@ -106,6 +106,7 @@ class ACPlayer(Player):
                """
     def get_direction(self,next_action):
         next_action=next_action+1
+
         if next_action == 1:
             next_direction = Direction.UP
         if next_action == 2:

@@ -431,14 +431,10 @@ def train():
             print("Average duration :", float(move_counter)/float(DISPLAY_CYCLE))
             print("Loss =", loss_value)
             print("Epsilon =", epsilon)
-            # print("Max duration :", max_du)
-            # print("score p1 vs p2 =", win_p1, ":", win_p2)
             print("minimax state=", mini)
-            # p1_winrate = p1_victories / (GAME_CYCLE)
             print("mini", minimax_match)
             print("")
-            # print("old", old_memory.position, "posi", len(old_memory.memory), "mem size")
-            # print("new", memory.position, "posi", len(memory.memory), "mem size")
+
             if not(mini):
                 p1_winrate=-1
             else:
@@ -448,10 +444,7 @@ def train():
             writer.add_scalar('Training loss', float(loss_value), game_counter)
             writer.add_scalar('Duration', (float(move_counter) / float(DISPLAY_CYCLE)), game_counter)
             writer.add_scalar('Win rate', p1_winrate, game_counter)
-            # writer.add_scalar('test', under_minus_26, game_counter)
 
-            # with open('ais/' + folderName +'/'+ '/data.txt', 'a') as myfile:
-            #     myfile.write(str(game_counter) + ', ' + str(float(move_counter)/float(DISPLAY_CYCLE)) + ', ' + loss_value + '\n')
 
             move_counter = 0
 

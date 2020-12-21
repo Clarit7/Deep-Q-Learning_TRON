@@ -5,7 +5,7 @@ from util import *
 
 import random
 
-folderName='/save'
+folderName='save'
 
 def randomPosition(width, height):
     x = random.randint(0, width - 1)
@@ -44,7 +44,7 @@ def main():
     pygame.init()
 
     model = Net().to('cuda')
-    model.load_state_dict(torch.load(folderName + '/A2CPlayer.bak'),strict=False)
+    model.load_state_dict(torch.load(folderName + '/ACKTR_player.bak'),strict=False)
 
     while (True):
 

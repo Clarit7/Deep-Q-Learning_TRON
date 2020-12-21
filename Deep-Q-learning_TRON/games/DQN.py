@@ -1,10 +1,10 @@
-from object.player import Player, Direction
-from object.game import Tile, Game, PositionPlayer
-from tron.window import Window
+from tron.player import Player, Direction
+from tron.game import  Game, PositionPlayer
+
 from collections import namedtuple
 from torch.utils.tensorboard import SummaryWriter
 from tron.minimax import MinimaxPlayer
-from tron import resnet
+from Net import Net
 
 import torch
 import torch.nn as nn
@@ -14,7 +14,6 @@ import numpy as np
 import random
 import visdom
 
-import os
 
 
 # General parameters
@@ -24,7 +23,6 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # Net parameters
 BATCH_SIZE = 128
 GAMMA = 0.9 # Discount factor
-conv1x1=resnet.conv1x1
 
 # Exploration parameters
 EPSILON_START = 1
@@ -41,95 +39,6 @@ MEM_CAPACITY = 10000
 # Cycle parameters
 GAME_CYCLE = 20
 DISPLAY_CYCLE = GAME_CYCLE
-
-
-class Net(nn.Module):
-	def __init__(self):
-		super(Net, self).__init__()
-		self.batch_size = BATCH_SIZE
-		self.gamma = GAMMA
-		self.inplanes = 1
-		self.layers = 1
-
-		# self.conv1 = nn.Conv2d(1, 8, 5,padding=2)
-		# self.conv2 = nn.Conv2d(8, 32, 3,padding=1)
-		# self.conv3 = nn.Conv2d(32, 64, 3,padding=1)
-
-		# self.layer1=self._make_layer(BasicBlock,8,self.layers,stride=2)
-		# self.layer2 = self._make_layer(BasicBlock, 64, self.layers)
-		# self.layer3 = self._make_layer(BasicBlock, 128, self.layers)
-		self.conv1 = nn.Conv2d(1, 8, 7, padding=3, stride=2)
-		self.conv2 = nn.Conv2d(8, 32, 5, padding=2, stride=2)
-		self.conv3 = nn.Conv2d(32, 64, 5, padding=2)
-		self.conv4 = nn.Conv2d(64, 256, 3, padding=1)
-
-		# self.conv1=nn.Conv2d(1, 32, 6)
-		# self.conv2 = nn.Conv2d(32, 64, 3)
-
-		self.fc1 = nn.Linear(256 * 1 * 1, 256)
-		# self.fc2 = nn.Linear(256, 512)
-		# self.fc3 = nn.Linear(512, 256)
-		self.fc4 = nn.Linear(256, 64)
-		self.fc5 = nn.Linear(64, 4)
-
-		self.maxPool = nn.MaxPool2d(kernel_size=3, stride=1)
-
-		self.dropout = nn.Dropout(p=0.2)
-
-		self.batch_norm = nn.BatchNorm2d(1)
-		torch.nn.init.xavier_uniform_(self.fc1.weight)
-		# torch.nn.init.xavier_uniform_(self.fc2.weight)
-		# torch.nn.init.xavier_uniform_(self.fc3.weight)
-		torch.nn.init.xavier_uniform_(self.fc4.weight)
-		torch.nn.init.xavier_uniform_(self.fc5.weight)
-
-	def forward(self, x):
-		x = x.cuda()
-
-		x = self.batch_norm(x)
-		#
-		# x = self.layer1(x)
-		# x = self.layer2(x)
-		# x = self.AvgPool(x)
-		# x = self.layer3(x)
-		# x = self.AvgPool(x)
-
-		x = F.relu(self.conv1(x))
-		x = F.relu(self.conv2(x))
-		x = F.relu(self.conv3(x))
-		x = F.relu(self.conv4(x))
-		x = self.maxPool(x)
-
-		x = x.view(-1, 256 * 1 * 1)
-
-		x = self.dropout(F.relu(self.fc1(x)))
-		# x = self.dropout(F.relu(self.fc2(x)))
-		# x = self.dropout(F.relu(self.fc3(x)))
-		x = self.dropout(F.relu(self.fc4(x)))
-		x = self.fc5(x)
-
-		return x
-
-	def _make_layer(self, block, planes, blocks, stride=1):
-		downsample = None
-
-		if stride != 1 or self.inplanes != planes * block.expansion:
-			downsample = nn.Sequential(
-				conv1x1(self.inplanes, planes * block.expansion, stride),
-				nn.BatchNorm2d(planes * block.expansion),
-			)
-
-		layers = []
-
-		layers.append(block(self.inplanes, planes, stride, downsample))
-
-		self.inplanes = planes * block.expansion
-
-		for _ in range(1, blocks):
-			layers.append(block(self.inplanes, planes))
-
-		return nn.Sequential(*layers)
-
 
 class Ai(Player):
 
@@ -226,17 +135,10 @@ class ReplayMemory(object):
 
 def train(model):
 	writer = SummaryWriter()
-	vis = visdom.Visdom()
-
-	vis.close(env="main")
-	loss_plot = vis.line(Y=torch.Tensor(1).zero_(), opts=dict(title='loss_tracker', legend=['loss'], showlegend=True))
-	du_plot = vis.line(Y=torch.Tensor(1).zero_(), opts=dict(title='duration_tracker', legend=['duration'], showlegend=True))
-	win_plot = vis.line(Y=torch.Tensor(1).zero_(),opts=dict(title='rating_tracker', legend=['win_rate'], showlegend=True))
-	test_plot = vis.line(Y=torch.Tensor(1).zero_(), opts=dict(title='test', legend=['test'], showlegend=True))
 
 	# Initialize neural network parameters and optimizer
 	optimizer = optim.Adam(model.parameters())
-	criterion = nn.MSELoss()
+
 
 	# Initialize exploration rate
 	epsilon = EPSILON_START
@@ -244,27 +146,15 @@ def train(model):
 
 	# Initialize memory
 	memory = ReplayMemory(MEM_CAPACITY)
-	mini_memory= ReplayMemory(MEM_CAPACITY)
-	blowup1 = ReplayMemory(MEM_CAPACITY)
-	blowup2 = ReplayMemory(MEM_CAPACITY)
 
 	# Initialize the game counter
 	game_counter = 0
 	move_counter = 0
 
-	win_p1 = 0
-	win_p2 = 0
-	changeAi = 0
+
 	vs_min_p1_win = 0
 	minimax_game = 0
-	minnimax_match = 1000
-	minimam_match = 1000
-	Aiset = True
-	otherOpponent = True
-	ai='basic'
-	rate=0
-	# Start training
-	player_2 = Ai(epsilon)
+
 	while True:
 
 		# Initialize the game cycle parameters
@@ -272,45 +162,14 @@ def train(model):
 		p1_victories = 0
 		p2_victories = 0
 		null_games = 0
+
 		player_1 = Ai(epsilon)
-		if(Aiset):
-			player_2 = Ai(epsilon)
+		player_2 = Ai(epsilon)
 
 
 
 		# Play a cycle of games
 		while cycle_step < GAME_CYCLE:
-			changeAi += 1
-
-			if (game_counter < 3000):
-				changeAi = 0
-
-			if (changeAi > minnimax_match):
-
-				if (Aiset):
-					#memory.reset()
-					player_2 = Ai(epsilon)
-					player_2.epsilon = epsilon
-					player_2 = MinimaxPlayer(2, 'VORNOI')
-
-					Aiset = False
-					otherOpponent = False
-					ai = 'minimax'
-					minnimax_match = (10000 * rate) + minimam_match
-
-				else:
-					#mini_memory.reset()
-					rate = vs_min_p1_win / minimax_game
-					minnimax_match = 10000 - minnimax_match
-					vs_min_p1_win = 0
-					minimax_game = 0
-					Aiset = True
-					player_2 = Ai(epsilon)
-					player_2.epsilon = epsilon
-					otherOpponent = True
-					ai = 'basic Ai'
-
-				changeAi = 0
 
 			# Increment the counters
 			game_counter += 1
@@ -327,8 +186,8 @@ def train(model):
 
 			# Initialize the game
 			player_1.epsilon = epsilon
-			if(Aiset):
-				player_2.epsilon = epsilon
+			player_2.epsilon = epsilon
+
 			game = Game(MAP_WIDTH,MAP_HEIGHT, [
 						PositionPlayer(1, player_1, [x1, y1]),
 						PositionPlayer(2, player_2, [x2, y2]),])
@@ -341,11 +200,6 @@ def train(model):
 			old_state_p2 = np.reshape(old_state_p2, (1, 1, old_state_p2.shape[0], old_state_p2.shape[1]))
 			old_state_p2 = torch.from_numpy(old_state_p2).float()
 
-			# Run the game
-			# if VisibleScreen:
-			# 	window = Window(game, 40)
-			# 	game.main_loop(window)
-			# else:
 			game.main_loop()
 
 			# Analyze the game
@@ -380,53 +234,17 @@ def train(model):
 						reward_p1 = 0
 						reward_p2 = 0
 
-						# sample1 = blowup1.delete_old(len(blowup1.memory))
-						# for i in sample1:
-						# 	list1 = list(i)
-						# 	list1[3] = 1
-						# 	list1[3] = torch.from_numpy(np.array([list1[3]], dtype=np.float32)).unsqueeze(0)
-						# 	memory.push(list1[0], list1[1], list1[2], list1[3], list1[4])
-						#
-						# reward_p1 = torch.from_numpy(np.array([reward_p1], dtype=np.float32)).unsqueeze(0)
-						# terminal = True
-						# memory.push(old_state_p1, action_p1, new_state_p1, reward_p1, terminal)
 
 					elif game.winner == 1:
 						reward_p1 = 100
 						reward_p2 = -25
 						p1_victories +=1
 
-						# sample1 = blowup1.delete_old(len(blowup1.memory))
-						#
-						# for i in sample1:
-						# 	list1 = list(i)
-						# 	list1[3] = list1[3].item()
-						# 	list1[3] = torch.from_numpy(np.array([list1[3]], dtype=np.float32)).unsqueeze(0)
-						# 	memory.push(list1[0], list1[1], list1[2], list1[3], list1[4])
-						#
-						# reward_p1 = torch.from_numpy(np.array([reward_p1], dtype=np.float32)).unsqueeze(0)
-						# terminal = True
-						# memory.push(old_state_p1, action_p1, new_state_p1, reward_p1, terminal)
-						if not (Aiset):
-							vs_min_p1_win+=1
 					else:
 						reward_p1 = -25
 						reward_p2 = 100
 						p2_victories += 1
 
-						# sample1 = blowup1.delete_old(len(blowup1.memory))
-						# for i in sample1:
-						# 	list1 = list(i)
-						# 	list1[3] = (-list1[3].item())
-						# 	list1[3] = torch.from_numpy(np.array([list1[3]], dtype=np.float32)).unsqueeze(0)
-						#
-						# 	memory.push(list1[0], list1[1], list1[2], list1[3], list1[4])
-						#
-						# reward_p1 = torch.from_numpy(np.array([reward_p1], dtype=np.float32)).unsqueeze(0)
-						# terminal = True
-						# memory.push(old_state_p1, action_p1, new_state_p1, reward_p1, terminal)
-					if not (Aiset):
-						minimax_game += 1
 					terminal=True
 
 				reward_p1 = torch.from_numpy(np.array([reward_p1], dtype=np.float32)).unsqueeze(0)
@@ -435,12 +253,6 @@ def train(model):
 				#Save the transition for each player
 				memory.push(old_state_p1, action_p1, new_state_p1, reward_p1, terminal)
 				memory.push(old_state_p2, action_p2, new_state_p2, reward_p2, terminal)
-
-				# if not(otherOpponent) :
-				# 	mini_memory.push(old_state_p2, action_p2, new_state_p2, reward_p2, terminal)
-
-				# if not (terminal):
-				# 	blowup1.push(old_state_p1, action_p1, new_state_p1, reward_p1, terminal)
 
 				# Update old state for each player
 				old_state_p1 = new_state_p1
@@ -456,17 +268,11 @@ def train(model):
 
 		# Get a sample for training
 		transitions = memory.sample(min(len(memory), model.batch_size))
-		# if (otherOpponent):
-		# 	transitions = memory.sample(min(len(memory),model.batch_size))
-		# if not (otherOpponent):
-		#
-		# 	transitions = mini_memory.sample(min(len(mini_memory), model.batch_size))
-		#print(transitions)
-		#print(transitions)
+
 		batch = Transition(*zip(*transitions))
+
 		old_state_batch = torch.cat(batch.old_state)
 		action_batch = torch.cat(batch.action).long()
-		print(action_batch)
 		new_state_batch = torch.cat(batch.new_state)
 		reward_batch = torch.cat(batch.reward).to(device)
 
@@ -480,11 +286,6 @@ def train(model):
 					   for i in range(len(reward_batch)))).to(device)
 
 		# zero the parameter gradients
-
-		under_minus_26 = 0
-		if (torch.min(pred_q_values_next_batch) < (-25)):
-			if (game_counter % 100 == 0):
-				under_minus_26 = torch.sum(pred_q_values_next_batch < -25).squeeze()
 
 		model.zero_grad()
 
@@ -500,54 +301,19 @@ def train(model):
 		# Update bak
 		torch.save(model.state_dict(), 'ais/' + folderName +'/'+'_ai.bak')
 		p1_winrate = p1_victories / (GAME_CYCLE)
-		# Display results
+
+
 		if (game_counter%DISPLAY_CYCLE)==0:
 
 			loss_string = str(loss)
 			loss_string = loss_string[7:len(loss_string)]
 			loss_value = loss_string.split(',')[0]
-			print("--- Match", game_counter, "---")
-			print("Average duration :", float(move_counter)/float(DISPLAY_CYCLE))
-			print("Loss =", loss_value)
-			print("Epsilon =", epsilon)
-			print("")
-			#print("Max duration :", max_du)
-			print("score p1 vs p2 =", win_p1, ":", win_p2)
-			print("ai state=", ai)
-			p1_winrate = p1_victories / (GAME_CYCLE)
-			print("mini", minnimax_match)
-			#print("old", old_memory.position, "posi", len(old_memory.memory), "mem size")
-			print("new", memory.position, "posi", len(memory.memory), "mem size")
-
 			vis_loss = float(loss_value)
-			vis.line(X=torch.tensor([game_counter]),
-					 Y=torch.tensor([vis_loss]),
-					 win=loss_plot,
-					 update='append'
-					 )
-			vis.line(X=torch.tensor([game_counter]),
-					 Y=torch.tensor([float(move_counter) / float(DISPLAY_CYCLE)]),
-					 win=du_plot,
-					 update='append'
-					 )
-			vis.line(X=torch.tensor([game_counter]),
-					 Y=torch.tensor([p1_winrate]),
-					 win=win_plot,
-					 update='append'
-					 )
 
-			vis.line(X=torch.tensor([game_counter]),
-					 Y=torch.tensor([under_minus_26]),
-					 win=test_plot,
-					 update='append'
-					 )
 			writer.add_scalar('loss_tracker', vis_loss, game_counter)
 			writer.add_scalar('duration_tracker', (float(move_counter) / float(DISPLAY_CYCLE)), game_counter)
 			writer.add_scalar('ration_tracker', p1_winrate, game_counter)
-			writer.add_scalar('test', under_minus_26, game_counter)
-			if(game_counter>300000):
-				with open('ais/' + folderName +'/'+ '/data.txt', 'a') as myfile:
-					myfile.write(str(game_counter) + ', ' + str(float(move_counter)/float(DISPLAY_CYCLE)) + ', ' + loss_value + '\n')
+
 
 			move_counter = 0
 
@@ -555,8 +321,6 @@ def train(model):
 
 def main():
 	model = Net().to(device)
-	# if os.path.isfile('ais/' + folderName + '/_ai.bak'):
-	#   	model.load_state_dict(torch.load('ais/' + folderName + '/_ai.bak'))
 	train(model)
 
 if __name__ == "__main__":
