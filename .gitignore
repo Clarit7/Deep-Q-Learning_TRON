@@ -24,6 +24,9 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.idea/
+Deep-Q-learning_TRON/runs/
+Deep-Q-learning_TRON/ais/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
