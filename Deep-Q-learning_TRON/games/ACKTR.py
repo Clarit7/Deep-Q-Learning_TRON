@@ -1,5 +1,5 @@
 import torch.nn as nn
-from Net import Net
+from Net.Net import Net
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime

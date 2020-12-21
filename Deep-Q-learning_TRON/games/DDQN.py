@@ -2,10 +2,9 @@ from collections import namedtuple,deque
 import os
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-from tron.player import ACPlayer
 
 from util import *
-from Net import Net
+from Net.Net import Net
 
 # General parameters
 folderName = 'survivor'
