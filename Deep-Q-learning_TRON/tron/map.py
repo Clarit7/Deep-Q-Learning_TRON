@@ -1,8 +1,10 @@
 import numpy as np
 from enum import Enum
 
+
 def is_on_border(i, j, w ,h):
     return i == 0 or i == w - 1 or j == 0 or j == h - 1
+
 
 class Tile(Enum):
     EMPTY = 0

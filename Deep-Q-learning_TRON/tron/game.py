@@ -21,9 +21,11 @@ class SetQueue(queue.Queue):
         self.queue.remove(head)
         return head
 
+
 class Winner(Enum):
     PLAYER_ONE = 1
     PLAYER_TWO = 2
+
 
 class PositionPlayer:
     def __init__(self, id, player, position):
@@ -50,6 +52,7 @@ class HistoryElement:
         self.map = mmap
         self.player_one_direction = player_one_direction
         self.player_two_direction = player_two_direction
+
 
 class Game:
     def __init__(self, width, height, pps):
@@ -104,9 +107,45 @@ class Game:
         return True
 
     def get_longest_path(self, map_clone, p1, p2):
-        return 0
+        p1_length = self.get_length(np.copy(map_clone.state_for_player(1)), p1.position[0] + 1, p1.position[1] + 1, 0, None)
+        p2_length = self.get_length(np.copy(map_clone.state_for_player(2)), p2.position[0] + 1, p2.position[1] + 1, 0, p1_length)
 
-    def next_frame(self, action_p1, action_p2,window=None):
+        if p2_length == -10 or p1_length < p2_length:
+            return 2
+        elif p1_length > p2_length:
+            return 1
+        else:
+            return 0
+
+    def get_length(self, map_clone, x, y, length, prev_length):
+        map_clone[x, y] = 5
+        l1, l2, l3, l4 = -1, -1, -1, -1
+        if map_clone[x, y - 1] == 1:
+            l1 = self.get_length(map_clone, x, y - 1, length + 1, prev_length)
+            if l1 == -10:
+                return -10
+        if map_clone[x + 1, y] == 1:
+            l2 = self.get_length(map_clone, x + 1, y, length + 1, prev_length)
+            if l2 == -10:
+                return -10
+        if map_clone[x, y + 1] == 1:
+            l3 = self.get_length(map_clone, x, y + 1, length + 1, prev_length)
+            if l3 == -10:
+                return -10
+        if map_clone[x - 1, y] == 1:
+            l4 = self.get_length(map_clone, x - 1, y, length + 1, prev_length)
+            if l4 == -10:
+                return -10
+
+        if prev_length is not None and max(l1, l2, l3, l4) > prev_length:
+            return -10
+
+        if l1 == -1 and l2 == -1 and l3 == -1 and l4 == -1:
+            return length
+
+        return max(l1, l2, l3, l4)
+
+    def next_frame(self, action_p1, action_p2, window=None):
 
         map_clone = self.map()
 
@@ -131,7 +170,6 @@ class Game:
                     pp.position[0] >= self.width or pp.position[1] >= self.height:
                 pp.alive, done = False, True
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
-
             elif map_clone[pp.position[0], pp.position[1]] is not Tile.EMPTY:
                 pp.alive, done = False, True
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
@@ -139,8 +177,14 @@ class Game:
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
 
         if not done and self.check_separated(map_clone, self.pps[0]):
-            print("get longest path")
-            self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+            winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+            if winner == 1:
+                self.pps[1].alive = False
+            elif winner == 2:
+                self.pps[0].alive = False
+            else:
+                self.pps[0].alive = False
+                self.pps[1].alive = False
 
         self.history.append(HistoryElement(map_clone, None, None))
         self.next_p1 = self.history[-1].map.state_for_player(1)
@@ -205,8 +249,8 @@ class Game:
             map=self.map()
 
 
-            action1=model.act( np.expand_dims(pop(map.state_for_player(1)), axis=0))
-            action2 = model.act( np.expand_dims(pop(map.state_for_player(2)), axis=0))
+            action1 = model.act(np.expand_dims(pop(map.state_for_player(1)), axis=0))
+            action2 = model.act(np.expand_dims(pop(map.state_for_player(2)), axis=0))
 
             if not self.next_frame(action1,action2,window):
                 break
