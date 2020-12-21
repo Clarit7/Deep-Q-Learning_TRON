@@ -5,6 +5,7 @@ from tron.map import Map, Tile
 from tron.player import ACPlayer
 from orderedset import OrderedSet
 
+import torch
 import numpy as np
 import queue
 
@@ -252,8 +253,8 @@ class Game:
             map=self.map()
 
 
-            action1 = model.act(np.expand_dims(pop(map.state_for_player(1)), axis=0))
-            action2 = model.act(np.expand_dims(pop(map.state_for_player(2)), axis=0))
+            action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
+            action2 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
 
             if not self.next_frame(action1,action2,window):
                 break
