@@ -17,6 +17,7 @@ folderName = 'survivor'
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Net parameters
+
 BATCH_SIZE = 64
 GAMMA = 0.9 # Discount factor
 
