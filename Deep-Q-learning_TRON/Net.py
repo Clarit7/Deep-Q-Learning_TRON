@@ -54,8 +54,6 @@ class Net(nn.Module):
     def deterministic_act(self, x):
         '''상태 x로부터 행동을 확률적으로 결정'''
         value, actor_output = self(x)
-        # actor_output=torch.clamp_min_(actor_output,min=0)
-        # dim=1이므로 행동의 종류에 대해 softmax를 적용
         return torch.argmax(actor_output, dim=1)
 
     def get_value(self, x):
@@ -69,9 +67,6 @@ class Net(nn.Module):
         value, actor_output = self(x)
 
         log_probs = F.log_softmax(actor_output, dim=1)  # dim=1이므로 행동의 종류에 대해 확률을 계산
-        #print(actor_output)
-        #print(torch.clamp(F.softmax(actor_output,dim=1),min=0.001,max=3))
-        #print(actions)
         action_log_probs = log_probs.gather(1, actions.detach())  # 실제 행동의 로그 확률(log_probs)을 구함
 
         probs = F.softmax(actor_output, dim=1)  # dim=1이므로 행동의 종류에 대한 계산
