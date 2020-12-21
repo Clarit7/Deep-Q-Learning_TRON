@@ -1,4 +1,4 @@
-from tron.player import Player, Direction
+from object.player import Player, Direction
 from orderedset import OrderedSet
 from enum import Enum
 import numpy as np

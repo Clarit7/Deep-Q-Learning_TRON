@@ -1,5 +1,5 @@
-from tron.player import Player, Direction
-from tron.game import Tile, Game, PositionPlayer
+from object.player import Player, Direction
+from object.game import Tile, Game, PositionPlayer
 from tron.window import Window
 from collections import namedtuple
 from torch.utils.tensorboard import SummaryWriter
@@ -139,8 +139,8 @@ class Ai(Player):
 		self.epsilon = epsilon
 		# Load network weights if they have been initialized already
 
-		if os.path.isfile('ais/' + folderName  +'/'+ '_ai.bak'):
-			self.net.load_state_dict(torch.load('ais/' + folderName +'/' + '_ai.bak'))
+		# if os.path.isfile('ais/' + folderName  +'/'+ '_ai.bak'):
+		# 	self.net.load_state_dict(torch.load('ais/' + folderName +'/' + '_ai.bak'))
 
 
 	def action(self, map, id):
@@ -545,9 +545,9 @@ def train(model):
 			writer.add_scalar('duration_tracker', (float(move_counter) / float(DISPLAY_CYCLE)), game_counter)
 			writer.add_scalar('ration_tracker', p1_winrate, game_counter)
 			writer.add_scalar('test', under_minus_26, game_counter)
-
-			with open('ais/' + folderName +'/'+ '/data.txt', 'a') as myfile:
-				myfile.write(str(game_counter) + ', ' + str(float(move_counter)/float(DISPLAY_CYCLE)) + ', ' + loss_value + '\n')
+			if(game_counter>300000):
+				with open('ais/' + folderName +'/'+ '/data.txt', 'a') as myfile:
+					myfile.write(str(game_counter) + ', ' + str(float(move_counter)/float(DISPLAY_CYCLE)) + ', ' + loss_value + '\n')
 
 			move_counter = 0
 
@@ -555,8 +555,8 @@ def train(model):
 
 def main():
 	model = Net().to(device)
-	if os.path.isfile('ais/' + folderName + '/_ai.bak'):
-	  	model.load_state_dict(torch.load('ais/' + folderName + '/_ai.bak'))
+	# if os.path.isfile('ais/' + folderName + '/_ai.bak'):
+	#   	model.load_state_dict(torch.load('ais/' + folderName + '/_ai.bak'))
 	train(model)
 
 if __name__ == "__main__":
