@@ -3,8 +3,23 @@ from enum import Enum
 
 from tron.map import Map, Tile
 from tron.player import ACPlayer
+from orderedset import OrderedSet
 
 import numpy as np
+import queue
+
+
+class SetQueue(queue.Queue):
+    def _init(self, maxsize):
+        self.queue = OrderedSet()
+
+    def _put(self, item):
+        self.queue.add(item)
+
+    def _get(self):
+        head = self.queue.__getitem__(0)
+        self.queue.remove(head)
+        return head
 
 class Winner(Enum):
     PLAYER_ONE = 1
@@ -57,6 +72,40 @@ class Game:
     def map(self):
         return self.history[-1].map.clone()
 
+    def check_separated(self, map_clone, p1):
+        path_queue = SetQueue()
+        dist_map = np.copy(map_clone.state_for_player(1))
+        path_queue._put((p1.position[0] + 1, p1.position[1] + 1))
+
+        while not path_queue.empty():
+            queue_elem = path_queue._get()
+            x = queue_elem[0]
+            y = queue_elem[1]
+
+            dist_map[x, y] = 5
+
+            if dist_map[x, y - 1] == 1:
+                path_queue._put((x, y - 1))
+            elif dist_map[x, y - 1] == -10:
+                return False
+            if dist_map[x + 1, y] == 1:
+                path_queue._put((x + 1, y))
+            elif dist_map[x + 1, y] == -10:
+                return False
+            if dist_map[x, y + 1] == 1:
+                path_queue._put((x, y + 1))
+            elif dist_map[x, y + 1] == -10:
+                return False
+            if dist_map[x - 1, y] == 1:
+                path_queue._put((x - 1, y))
+            elif dist_map[x - 1, y] == -10:
+                return False
+
+        return True
+
+    def get_longest_path(self, map_clone, p1, p2):
+        return 0
+
     def next_frame(self, action_p1, action_p2,window=None):
 
         map_clone = self.map()
@@ -67,8 +116,6 @@ class Game:
             map_clone[pp.position[0], pp.position[1]] = pp.body()
 
         for id, pp in enumerate(self.pps):
-            # try:
-
             if type(pp.player) == type(ACPlayer()):
                 (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, action[id])
 
@@ -78,19 +125,22 @@ class Game:
         self.history[-1].player_one_direction = self.pps[0].player.direction
         self.history[-1].player_two_direction = self.pps[1].player.direction
 
+        done = False
         for (id, pp) in enumerate(self.pps):
             if pp.position[0] < 0 or pp.position[1] < 0 or \
                     pp.position[0] >= self.width or pp.position[1] >= self.height:
-
-                pp.alive = False
+                pp.alive, done = False, True
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
 
             elif map_clone[pp.position[0], pp.position[1]] is not Tile.EMPTY:
-                pp.alive = False
-
+                pp.alive, done = False, True
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
             else:
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
+
+        if not done and self.check_separated(map_clone, self.pps[0]):
+            print("get longest path")
+            self.get_longest_path(map_clone, self.pps[0], self.pps[1])
 
         self.history.append(HistoryElement(map_clone, None, None))
         self.next_p1 = self.history[-1].map.state_for_player(1)
@@ -151,7 +201,7 @@ class Game:
             alive = None
 
             if window:
-                sleep(0.3)
+                sleep(0.1)
             map=self.map()
 
 

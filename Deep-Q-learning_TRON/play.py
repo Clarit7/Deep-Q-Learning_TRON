@@ -46,15 +46,13 @@ def main():
 
     actor_critic = Net()  # 신경망 객체 생성
     global_brain = Brain(actor_critic, acktr=True)
-    global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player.bak'))
+    # global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player.bak'))
 
     global_brain.actor_critic.eval()
 
-    while (True):
-
-        game = make_game(True,False)
+    while True:
+        game = make_game(False, False)
         pygame.mouse.set_visible(False)
-
 
         window = Window(game, 40)
         # displayGameMenu(window, game)
