@@ -24,12 +24,11 @@ class Net(nn.Module):
 
     def forward(self, x):
         '''신경망 순전파 계산을 정의'''
-        x = torch.tensor(x).float()
 
         x = x.to(device)
 
-        x = F.tanh(self.conv1(x))
-        x = F.tanh(self.conv2(x))
+        x = torch.tanh(self.conv1(x))
+        x = torch.tanh(self.conv2(x))
 
         x = x.view(-1, 64 * 5 * 5)
 

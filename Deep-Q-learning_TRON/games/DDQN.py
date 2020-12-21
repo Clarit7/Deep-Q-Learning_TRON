@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
 from util import *
-from Net.Net import Net
+from Net.DQNNet import Net
 
 # General parameters
 folderName = 'survivor'
@@ -213,9 +213,7 @@ class ReplayBuffer:
 def train():
     writer = SummaryWriter('runs/Double DQN')
 
-
     # Initialize exploration rate
-
     epsilon = EPSILON_START
     epsilon_temp = float(epsilon)
 
@@ -223,19 +221,11 @@ def train():
     game_counter = 0
     move_counter = 0
 
-
     changeAi = 0
 
-
-    ai='basic'
-
-    # vs minimax
-
     win_p1 = 0
-    win_p2 = 0
-    rate=0
     play_with_minimax=0
-    defalt_match=1000
+
     minimax_match=0
     mini=False
     duel_mini=False
@@ -254,11 +244,9 @@ def train():
         p2_victories = 0
         null_games = 0
 
-
-
         # Play a cycle of games
         while cycle_step < GAME_CYCLE:
-            #print(cycle_step)
+
             # Increment the counters
             game_counter += 1
             cycle_step += 1
@@ -301,8 +289,8 @@ def train():
                 y1 = random.randint(0,MAP_HEIGHT-1)
             # Initialize the game
 
-            player1 = player()
-            player2 = player()
+            player1 = ACPlayer()
+            player2 = ACPlayer()
             #
             game = Game(MAP_WIDTH,MAP_HEIGHT, [
                 PositionPlayer(1,player1, [x1, y1]),
@@ -334,17 +322,8 @@ def train():
             while not(done):
                 brain.epsilon=epsilon
 
-                if(duel_mini):
-                    p1_action = minimax.action(game.map(), 2) - 1
-                    p2_action = minimax.action(game.map(), 2) - 1
-
-
-                elif(mini):
-                    p1_action = brain.action(old_state_p1)
-                    p2_action = minimax.action(game.map(), 2) - 1
-                else:
-                    p1_action = brain.action(old_state_p1)
-                    p2_action = brain.action(old_state_p2)
+                p1_action = brain.action(old_state_p1)
+                p2_action = brain.action(old_state_p2)
 
                 p1_next_state, p1_reward,p2_next_state, p2_reward,done= game.step(p1_action, p2_action)
 
@@ -410,8 +389,6 @@ def train():
         # Compute the loss
 
 
-
-        #p1_winrate = p1_victories / (GAME_CYCLE)
         # Display results
         # Update bak
         torch.save(brain.qnetwork_local.state_dict(), 'ais/' + folderName + '/' + 'local_ai.bak')
