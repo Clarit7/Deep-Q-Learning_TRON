@@ -312,7 +312,6 @@ class MinimaxPlayer(Player):
     def next_position_and_direction(self, current_position,id,map):
 
         direction = self.action(map,id)
-        print(direction)
         return (self.next_position(current_position, direction), direction)
 
     def next_position(self, current_position, direction):

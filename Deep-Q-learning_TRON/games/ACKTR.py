@@ -3,6 +3,8 @@ from Net import Net
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
+import pygame
+from tron.window import Window
 
 from kfac import KFACOptimizer
 from util import *
@@ -146,13 +148,13 @@ def train():
     prob1_loss_sum1=0
     advan_loss_sum1=0
 
-    ai_p1=True
-    ai_p2=True
+    ai_p1=False
+    ai_p2=False
 
     envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
 
-    eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent:') + str(entropy_coef) + '-step:' + str(
-        NUM_ADVANCED_STEP) + '-process:' + str(NUM_PROCESSES)
+    eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-step ' + str(
+        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES)
 
     writer = SummaryWriter(eventid)
 
@@ -309,6 +311,16 @@ def train():
         prob1_loss_sum1+=prob1
         advan_loss_sum1+=advan1
 
+        if(gamecount>2000):
+            pygame.init()
+            game = make_game(True, True)
+            pygame.mouse.set_visible(False)
+
+            window = Window(game, 40)
+            # displayGameMenu(window, game)
+
+            game.main_loop(global_brain.actor_critic, pop_up, window)
+
 
         if(losscount%SHOW_ITER==0):
             total_loss_sum1 =total_loss_sum1 / SHOW_ITER
@@ -323,12 +335,12 @@ def train():
             if (total_loss_sum1 < min):
                 min=act_loss_sum1
 
-            # torch.save(global_brain.actor_critic.state_dict(), './ais/ACKTR/' + 'ACKTR_player.bak')
+            torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'ACKTR_player.bak')
             # torch.save(global_brain2.actor_critic.state_dict(), 'ais/a3c/' + 'player_2.bak')
 
             writer.add_scalar('Training loss', total_loss_sum1, losscount)
             writer.add_scalar('Value loss', val_loss_sum1, losscount)
-            writer.add_scalar('Action gain', act_loss_sum1, losscount)
+            writer.add_scalar('Action gain', act_loss_sum1, )
             writer.add_scalar('Entropy loss', entropy_sum1, losscount)
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)

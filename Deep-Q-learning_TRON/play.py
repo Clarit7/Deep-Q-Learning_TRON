@@ -2,10 +2,11 @@ import pygame
 from tron.window import Window
 from Net import Net
 from util import *
+from games.ACKTR import Brain
 
 import random
 
-folderName='save'
+folderName='games/save'
 
 def randomPosition(width, height):
     x = random.randint(0, width - 1)
@@ -43,18 +44,22 @@ def printGameResults(game):
 def main():
     pygame.init()
 
-    model = Net().to('cuda')
-    model.load_state_dict(torch.load(folderName + '/ACKTR_player.bak'),strict=False)
+    actor_critic = Net()  # 신경망 객체 생성
+    global_brain = Brain(actor_critic, acktr=True)
+    global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player.bak'))
+
+    global_brain.actor_critic.eval()
 
     while (True):
 
-        game = make_game(True,True)
+        game = make_game(True,False)
         pygame.mouse.set_visible(False)
+
 
         window = Window(game, 40)
         # displayGameMenu(window, game)
 
-        game.main_loop(model,pop_up,window)
+        game.main_loop(global_brain.actor_critic,pop_up,window)
         printGameResults(game)
 
 
