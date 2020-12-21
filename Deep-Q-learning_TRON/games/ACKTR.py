@@ -148,8 +148,8 @@ def train():
     prob1_loss_sum1=0
     advan_loss_sum1=0
 
-    ai_p1=False
-    ai_p2=False
+    ai_p1=True
+    ai_p2=True
 
     envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
 
@@ -217,7 +217,7 @@ def train():
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i] = envs[i].step(act1,act2)
+                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len = envs[i].step(act1,act2)
 
                 each_step1[i] += 1
                 each_step2[i] += 1
@@ -227,11 +227,23 @@ def train():
                         reward_np1[i] = 0
                         reward_np2[i] = 0
                     elif envs[i].winner == 1:
-                        reward_np1[i] = 10
-                        reward_np2[i] = -10
+
+                        if loser_len == 0:
+                            reward_np1[i] = 10
+                            reward_np2[i] = -10
+                        else:
+                            reward_np1[i] = 10+150/loser_len
+                            reward_np2[i] = -10
+
                     else:
-                        reward_np1[i] = -10
-                        reward_np2[i] = 10
+                        if loser_len == 0:
+                            reward_np1[i] = -10
+                            reward_np2[i] = 10
+
+                        else:
+                            reward_np1[i] = -10
+                            reward_np2[i] = 10+150/loser_len
+
 
                     if (i == 0):
                         gamecount += 1

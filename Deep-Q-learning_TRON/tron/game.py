@@ -63,7 +63,7 @@ class Game:
         self.history = [HistoryElement(mmap, None, None)]
         self.pps = pps
         self.winner = None
-
+        self.loser_len=0
         self.next_p1 = []
         self.next_p2 = []
         self.reword = 0
@@ -111,8 +111,10 @@ class Game:
         p2_length = self.get_length(np.copy(map_clone.state_for_player(2)), p2.position[0] + 1, p2.position[1] + 1, 0, p1_length)
 
         if p2_length == -10 or p1_length < p2_length:
+            self.loser_len=p1_length
             return 2
         elif p1_length > p2_length:
+            self.loser_len=p2_length
             return 1
         else:
             return 0
@@ -218,7 +220,8 @@ class Game:
 
         if not self.next_frame(action_p1, action_p2):
             self.done = True
-            return self.next_p1, self.reword, self.next_p2, self.reword, self.done
+
+            return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len
 
         for pp in self.pps:
             if pp.alive:
@@ -233,7 +236,7 @@ class Game:
 
             self.done = True
 
-        return self.next_p1, self.reword, self.next_p2, self.reword, self.done
+        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0
 
     def main_loop(self,model, pop,window=None):
 
