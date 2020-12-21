@@ -323,15 +323,14 @@ def train():
         prob1_loss_sum1+=prob1
         advan_loss_sum1+=advan1
 
-        if(gamecount>2000):
-            pygame.init()
-            game = make_game(True, True)
-            pygame.mouse.set_visible(False)
-
-            window = Window(game, 40)
-            # displayGameMenu(window, game)
-
-            game.main_loop(global_brain.actor_critic, pop_up, window)
+        # if(gamecount>2000):
+        #     pygame.init()
+        #     game = make_game(True, True)
+        #     pygame.mouse.set_visible(False)
+        #
+        #     window = Window(game, 40)
+        #
+        #     game.main_loop(global_brain.actor_critic, pop_up, window)
 
 
         if(losscount%SHOW_ITER==0):

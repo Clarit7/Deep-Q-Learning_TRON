@@ -110,9 +110,9 @@ class Agent():
         # Epsilon -greedy action selction
 
         if random.random() > self.epsilon:
-            return np.argmax(action_values.cpu().data.numpy())+1
+            return np.argmax(action_values.cpu().data.numpy())
         else:
-            return random.choice(np.arange(self.action_size)+1)
+            return random.choice(np.arange(self.action_size))
 
     def find_file(self, name):
         return '/'.join(self.__module__.split('.')[:-1]) + '/' + name
@@ -131,7 +131,7 @@ class Agent():
         self.qnetwork_target.eval()
         # shape of output from the model (batch_size,action_dim) = (64,4)
 
-        predicted_targets = self.qnetwork_local(states).gather(1, actions-1)
+        predicted_targets = self.qnetwork_local(states).gather(1, actions)
         #################Updates for Double DQN learning###########################
         self.qnetwork_local.eval()
         with torch.no_grad():
@@ -222,26 +222,20 @@ def train():
     move_counter = 0
 
     changeAi = 0
-
     win_p1 = 0
-    play_with_minimax=0
 
     minimax_match=0
     mini=False
-    duel_mini=False
-    start_mini=100000
+
 
 
 
 
     brain = Agent()
-    minimax=MinimaxPlayer(2,'voronoi')
     while True:
 
         # Initialize the game cycle parameters
         cycle_step = 0
-        p1_victories = 0
-        p2_victories = 0
         null_games = 0
 
         # Play a cycle of games
@@ -298,23 +292,23 @@ def train():
 
             # Get the initial state for each player
 
-            old_state_p1 = game.map().state_for_player(1)
-            old_state_p1 = pop_up(old_state_p1)
-            old_state_p1 = np.reshape(old_state_p1, (1, -1, old_state_p1.shape[1], old_state_p1.shape[2]))
-            old_state_p1 = torch.from_numpy(old_state_p1).float()
-
             # old_state_p1 = game.map().state_for_player(1)
-            # old_state_p1 = np.reshape(old_state_p1, (1, 1, old_state_p1.shape[0], old_state_p1.shape[1]))
+            # old_state_p1 = pop_up(old_state_p1)
+            # old_state_p1 = np.reshape(old_state_p1, (1, -1, old_state_p1.shape[1], old_state_p1.shape[2]))
             # old_state_p1 = torch.from_numpy(old_state_p1).float()
 
-            old_state_p2 = game.map().state_for_player(2)
-            old_state_p2 = pop_up(old_state_p2)
-            old_state_p2 = np.reshape(old_state_p2, (1, -1, old_state_p2.shape[1], old_state_p2.shape[2]))
-            old_state_p2 = torch.from_numpy(old_state_p2).float()
+            old_state_p1 = game.map().state_for_player(1)
+            old_state_p1 = np.reshape(old_state_p1, (1, 1, old_state_p1.shape[0], old_state_p1.shape[1]))
+            old_state_p1 = torch.from_numpy(old_state_p1).float()
 
             # old_state_p2 = game.map().state_for_player(2)
-            # old_state_p2 = np.reshape(old_state_p2, (1, 1, old_state_p2.shape[0], old_state_p2.shape[1]))
+            # old_state_p2 = pop_up(old_state_p2)
+            # old_state_p2 = np.reshape(old_state_p2, (1, -1, old_state_p2.shape[1], old_state_p2.shape[2]))
             # old_state_p2 = torch.from_numpy(old_state_p2).float()
+
+            old_state_p2 = game.map().state_for_player(2)
+            old_state_p2 = np.reshape(old_state_p2, (1, 1, old_state_p2.shape[0], old_state_p2.shape[1]))
+            old_state_p2 = torch.from_numpy(old_state_p2).float()
 
             done=False
             move = 0
@@ -325,28 +319,26 @@ def train():
                 p1_action = brain.action(old_state_p1)
                 p2_action = brain.action(old_state_p2)
 
-                p1_next_state, p1_reward,p2_next_state, p2_reward,done= game.step(p1_action, p2_action)
+                p1_next_state, p1_reward,p2_next_state, p2_reward,done,_= game.step(p1_action, p2_action)
 
                 move_counter += 1
                 move+=1
 
-                p1_next_state = pop_up(p1_next_state)
-                p1_next_state = np.reshape(p1_next_state, (1, -1, p1_next_state.shape[1], p1_next_state.shape[2]))
-                p1_next_state = torch.from_numpy(p1_next_state).float()
-
-                p2_next_state = pop_up(p2_next_state)
-                p2_next_state = np.reshape(p2_next_state, (1, -1, p2_next_state.shape[1], p2_next_state.shape[2]))
-                p2_next_state = torch.from_numpy(p2_next_state).float()
-
-                # p1_next_state = np.reshape(p1_next_state, (1, 1, p1_next_state.shape[0], p1_next_state.shape[1]))
+                # p1_next_state = pop_up(p1_next_state)
+                # p1_next_state = np.reshape(p1_next_state, (1, -1, p1_next_state.shape[1], p1_next_state.shape[2]))
                 # p1_next_state = torch.from_numpy(p1_next_state).float()
-                #
-                # p2_next_state = np.reshape(p2_next_state, (1, 1, p2_next_state.shape[0], p2_next_state.shape[1]))
+
+                # p2_next_state = pop_up(p2_next_state)
+                # p2_next_state = np.reshape(p2_next_state, (1, -1, p2_next_state.shape[1], p2_next_state.shape[2]))
                 # p2_next_state = torch.from_numpy(p2_next_state).float()
 
+                p1_next_state = np.reshape(p1_next_state, (1, 1, p1_next_state.shape[0], p1_next_state.shape[1]))
+                p1_next_state = torch.from_numpy(p1_next_state).float()
+
+                p2_next_state = np.reshape(p2_next_state, (1, 1, p2_next_state.shape[0], p2_next_state.shape[1]))
+                p2_next_state = torch.from_numpy(p2_next_state).float()
+
                 if done:
-                    if(mini):
-                        play_with_minimax += 1
 
                     if game.winner is None:
                         null_games += 1
@@ -356,17 +348,10 @@ def train():
                     elif game.winner == 1:
                         p1_reward = 100
                         p2_reward = -100
-                        p1_victories +=1
-
-                        if(mini):
-                            win_p1+=1
-
 
                     else:
                         p1_reward = -100
                         p2_reward = 100
-                        p2_victories += 1
-
 
                 brain.step(old_state_p1, p1_action, p1_reward, p1_next_state, done)
                 brain.step(old_state_p2, p2_action, p2_reward, p2_next_state, done)
@@ -391,12 +376,8 @@ def train():
 
         # Display results
         # Update bak
-        torch.save(brain.qnetwork_local.state_dict(), 'ais/' + folderName + '/' + 'local_ai.bak')
-        torch.save(brain.qnetwork_target.state_dict(), 'ais/' + folderName + '/' + 'target_ai.bak')
 
-        if(game_counter==start_mini):
-            torch.save(brain.qnetwork_local.state_dict(), 'ais/' + folderName + '/' + 'local_ai_200k.bak')
-            torch.save(brain.qnetwork_target.state_dict(), 'ais/' + folderName + '/' + 'target_ai_200k.bak')
+        torch.save(brain.qnetwork_target.state_dict(), 'save/DDQN.bak')
 
         if (game_counter%DISPLAY_CYCLE)==0:
             loss=brain.get_loss()
@@ -424,11 +405,6 @@ def train():
 
             move_counter = 0
 
-
-
-def main():
-    train()
-
 if __name__ == "__main__":
-    main()
+    train()
 

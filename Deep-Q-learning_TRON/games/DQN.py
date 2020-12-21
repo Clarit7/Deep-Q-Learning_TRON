@@ -132,7 +132,6 @@ def train(model):
 	# Initialize neural network parameters and optimizer
 	optimizer = optim.Adam(model.parameters())
 
-
 	# Initialize exploration rate
 	epsilon = EPSILON_START
 	epsilon_temp = float(epsilon)
@@ -193,7 +192,7 @@ def train(model):
 			old_state_p2 = np.reshape(old_state_p2, (1, 1, old_state_p2.shape[0], old_state_p2.shape[1]))
 			old_state_p2 = torch.from_numpy(old_state_p2).float()
 
-			game.main_loop()
+			game.main_loop(model)
 
 			# Analyze the game
 			move_counter += len(game.history)
@@ -292,7 +291,7 @@ def train(model):
 		optimizer.step()
 
 		# Update bak
-		torch.save(model.state_dict(), 'ais/' + folderName +'/'+'_ai.bak')
+		torch.save(model.state_dict(), 'save/DQN.bak')
 		p1_winrate = p1_victories / (GAME_CYCLE)
 
 

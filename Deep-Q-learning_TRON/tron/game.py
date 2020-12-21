@@ -4,6 +4,7 @@ from enum import Enum
 from tron.map import Map, Tile
 from tron.player import ACPlayer
 from orderedset import OrderedSet
+from tron.minimax import MinimaxPlayer
 
 import torch
 import numpy as np
@@ -158,11 +159,10 @@ class Game:
             map_clone[pp.position[0], pp.position[1]] = pp.body()
 
         for id, pp in enumerate(self.pps):
-            if type(pp.player) == type(ACPlayer()):
-                (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, action[id])
-
+            if type(pp.player) == type(MinimaxPlayer(2)):
+                (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, id + 1, self.map())
             else:
-                (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, id + 1,self.map())
+                (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, action[id])
 
         self.history[-1].player_one_direction = self.pps[0].player.direction
         self.history[-1].player_two_direction = self.pps[1].player.direction
@@ -239,7 +239,7 @@ class Game:
 
         return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0
 
-    def main_loop(self,model, pop,window=None):
+    def main_loop(self,model, pop=None,window=None):
 
         if window:
             window.render_map(self.map())
@@ -252,9 +252,15 @@ class Game:
                 sleep(0.1)
             map=self.map()
 
+            if(pop == None):
+                action1 = model.act(torch.tensor(np.reshape(map.state_for_player(1), (1, 1, map.state_for_player(1).shape[0],
+                                                                                      map.state_for_player(1).shape[1]))).float())
+                action2 = model.act(torch.tensor(np.reshape(map.state_for_player(2), (1, 1, map.state_for_player(2).shape[0],
+                                                                                      map.state_for_player(2).shape[1]))).float())
 
-            action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
-            action2 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
+            else:
+                action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
+                action2 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
 
             if not self.next_frame(action1,action2,window):
                 break
