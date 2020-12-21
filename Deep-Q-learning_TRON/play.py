@@ -1,6 +1,6 @@
 import pygame
 from tron.window import Window
-from Net import Net
+from Net.Net import Net
 from util import *
 from games.ACKTR import Brain
 

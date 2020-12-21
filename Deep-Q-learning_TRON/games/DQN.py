@@ -3,18 +3,13 @@ from tron.game import  Game, PositionPlayer
 
 from collections import namedtuple
 from torch.utils.tensorboard import SummaryWriter
-from tron.minimax import MinimaxPlayer
-from Net import Net
+from Net.Net import Net
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 import random
-import visdom
-
-
 
 # General parameters
 folderName = 'survivor'
