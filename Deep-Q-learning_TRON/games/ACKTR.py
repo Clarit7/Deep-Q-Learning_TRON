@@ -148,6 +148,8 @@ def train():
     prob1_loss_sum1=0
     advan_loss_sum1=0
 
+    p1_win = 0
+
     ai_p1=True
     ai_p2=True
 
@@ -217,37 +219,18 @@ def train():
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len = envs[i].step(act1,act2)
+                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len = envs[i].step(act1,act2)
 
                 each_step1[i] += 1
                 each_step2[i] += 1
 
                 if done_np[i]:
-                    if envs[i].winner is None:
-                        reward_np1[i] = 0
-                        reward_np2[i] = 0
-                    elif envs[i].winner == 1:
 
-                        if loser_len == 0:
-                            reward_np1[i] = 10
-                            reward_np2[i] = -10
-                        else:
-                            reward_np1[i] = 10+150/loser_len
-                            reward_np2[i] = -10
-
-                    else:
-                        if loser_len == 0:
-                            reward_np1[i] = -10
-                            reward_np2[i] = 10
-
-                        else:
-                            reward_np1[i] = -10
-                            reward_np2[i] = 10+150/loser_len
-
-
+                    reward_np1[i],reward_np2[i]=get_reward(envs[i],winner_len,loser_len)
                     if (i == 0):
                         gamecount += 1
-                        duration += each_step1[i]
+                        duration += each_step1[i]+loser_len
+
                         if(gamecount % SHOW_ITER==0):
                             print('%d Episode: Finished after %d steps' % (gamecount, each_step1[i]))
                             writer.add_scalar('Duration', duration/SHOW_ITER, gamecount)
@@ -351,12 +334,23 @@ def train():
 
             writer.add_scalar('Training loss', total_loss_sum1, losscount)
             writer.add_scalar('Value loss', val_loss_sum1, losscount)
-            writer.add_scalar('Action gain', act_loss_sum1, )
+            writer.add_scalar('Action gain', act_loss_sum1, losscount)
             writer.add_scalar('Entropy loss', entropy_sum1, losscount)
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
+            for i in range(PLAY_WITH_MINIMAX):
 
+                game = make_game(True, False)
+                game.main_loop(global_brain.actor_critic, pop_up)
+
+                if game.winner == 1:
+                    p1_win += 1
+
+            writer.add_scalar('rating', p1_win/PLAY_WITH_MINIMAX, losscount)
+
+
+            p1_win = 0
             act_loss_sum1 =0
             entropy_sum1 =0
             val_loss_sum1 =0

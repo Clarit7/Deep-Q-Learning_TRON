@@ -43,21 +43,52 @@ def printGameResults(game):
 
 def main():
     pygame.init()
-
+    rating=True
+    iter=30
     actor_critic = Net()  # 신경망 객체 생성
     global_brain = Brain(actor_critic, acktr=True)
-    global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player.bak'))
+    global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player2.bak'))
     global_brain.actor_critic.eval()
 
-    while True:
-        game = make_game(True, False)
-        pygame.mouse.set_visible(False)
+    actor_critic2 = Net()  # 신경망 객체 생성
+    global_brain2 = Brain(actor_critic2, acktr=True)
+    global_brain2.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player3.bak'))
+    global_brain2.actor_critic.eval()
 
-        window = Window(game, 40)
-        # displayGameMenu(window, game)
+    if rating:
+        nullgame=0
+        p1_win=0
+        p2_win=0
 
-        game.main_loop(global_brain.actor_critic,pop_up,window)
-        printGameResults(game)
+        for i in range(iter):
+
+            game = make_game(True, False)
+            pygame.mouse.set_visible(False)
+            window = None
+
+            game.main_loop(global_brain.actor_critic, pop_up, window, global_brain2.actor_critic)
+            if(game.winner is None):
+                nullgame+=1
+
+            elif(game.winner ==1 ):
+                p1_win+=1
+            else:
+                p2_win+=1
+
+        print("Player 1:{} \n Player 2:{}\n ",format(p1_win,p2_win))
+    else:
+
+        while True:
+            game = make_game(True, False)
+            pygame.mouse.set_visible(False)
+
+            window = Window(game, 40)
+            # displayGameMenu(window, game)
+            window=None
+
+            game.main_loop(global_brain.actor_critic,pop_up,window,global_brain2.actor_critic)
+            printGameResults(game)
+
 
 
 if __name__ == '__main__':

@@ -384,13 +384,6 @@ def train():
             loss_string = str(loss)
             loss_string = loss_string[7:len(loss_string)]
             loss_value = loss_string.split(',')[0]
-            print("--- Match", game_counter, "---")
-            print("Average duration :", float(move_counter)/float(DISPLAY_CYCLE))
-            print("Loss =", loss_value)
-            print("Epsilon =", epsilon)
-            print("minimax state=", mini)
-            print("mini", minimax_match)
-            print("")
 
             if not(mini):
                 p1_winrate=-1

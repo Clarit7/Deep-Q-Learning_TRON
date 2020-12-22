@@ -4,7 +4,6 @@ from enum import Enum
 from tron.map import Map, Tile
 from tron.player import ACPlayer
 from orderedset import OrderedSet
-from tron.minimax import MinimaxPlayer
 
 import torch
 import numpy as np
@@ -66,6 +65,7 @@ class Game:
         self.pps = pps
         self.winner = None
         self.loser_len=0
+        self.winner_len = 0
         self.next_p1 = []
         self.next_p2 = []
         self.reword = 0
@@ -110,18 +110,25 @@ class Game:
 
     def get_longest_path(self, map_clone, p1, p2):
         p1_length = self.get_length(np.copy(map_clone.state_for_player(1)), p1.position[0] + 1, p1.position[1] + 1, 0, None)
-        p2_length = self.get_length(np.copy(map_clone.state_for_player(2)), p2.position[0] + 1, p2.position[1] + 1, 0, p1_length)
+        p2_length = self.get_length(np.copy(map_clone.state_for_player(2)), p2.position[0] + 1, p2.position[1] + 1, 0, None)
 
-        if p2_length == -10 or p1_length < p2_length:
+        # if p2_length == -10 or p1_length < p2_length:
+        if p1_length < p2_length:
             self.loser_len=p1_length
+            self.winner_len=p2_length
             return 2
+
         elif p1_length > p2_length:
+
             self.loser_len=p2_length
+            self.winner_len=p1_length
+
             return 1
         else:
             return 0
 
     def get_length(self, map_clone, x, y, length, prev_length):
+
         map_clone[x, y] = 5
         l1, l2, l3, l4 = -1, -1, -1, -1
         if map_clone[x, y - 1] == 1:
@@ -159,10 +166,11 @@ class Game:
             map_clone[pp.position[0], pp.position[1]] = pp.body()
 
         for id, pp in enumerate(self.pps):
-            if type(pp.player) == type(MinimaxPlayer(2)):
-                (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, id + 1, self.map())
-            else:
+            if type(pp.player) == type(ACPlayer()):
                 (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, action[id])
+
+            else:
+                (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, id + 1,self.map())
 
         self.history[-1].player_one_direction = self.pps[0].player.direction
         self.history[-1].player_two_direction = self.pps[1].player.direction
@@ -222,7 +230,7 @@ class Game:
         if not self.next_frame(action_p1, action_p2):
             self.done = True
 
-            return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len
+            return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len
 
         for pp in self.pps:
             if pp.alive:
@@ -237,12 +245,15 @@ class Game:
 
             self.done = True
 
-        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0
+        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0
 
-    def main_loop(self,model, pop=None,window=None):
+    def main_loop(self,model, pop=None,window=None,model2=None):
 
         if window:
             window.render_map(self.map())
+
+        if (not model2):
+            model2=model
 
         while True:
             alive_count = 0
@@ -250,17 +261,18 @@ class Game:
 
             if window:
                 sleep(0.1)
+
             map=self.map()
 
             if(pop == None):
                 action1 = model.act(torch.tensor(np.reshape(map.state_for_player(1), (1, 1, map.state_for_player(1).shape[0],
                                                                                       map.state_for_player(1).shape[1]))).float())
-                action2 = model.act(torch.tensor(np.reshape(map.state_for_player(2), (1, 1, map.state_for_player(2).shape[0],
+                action2 = model2.act(torch.tensor(np.reshape(map.state_for_player(2), (1, 1, map.state_for_player(2).shape[0],
                                                                                       map.state_for_player(2).shape[1]))).float())
 
             else:
                 action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
-                action2 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
+                action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
 
             if not self.next_frame(action1,action2,window):
                 break

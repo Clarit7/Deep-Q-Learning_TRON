@@ -51,3 +51,19 @@ def make_game(p1,p2):
         PositionPlayer(2,  ACPlayer() if p2 else MinimaxPlayer(2, "voronoi"), [x2, y2]), ])
 
     return game
+def get_reward(game,winner_len,loser_len):
+
+    if game.winner is None:
+        return 0,0
+    elif game.winner == 1:
+
+        if loser_len == 0 and winner_len == 0:
+            return 10,-10
+        else:
+            return 10 + winner_len / 2, -10
+    else:
+        if loser_len == 0:
+            return -10, 10
+
+        else:
+            return -10,10 + winner_len / 2
