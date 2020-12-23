@@ -115,7 +115,6 @@ class ACPlayer(Player):
             next_direction = Direction.DOWN
         if next_action == 4:
             next_direction = Direction.LEFT
-
         return next_direction
 
     def next_position_and_direction(self, current_position, action):

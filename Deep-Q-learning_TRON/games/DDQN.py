@@ -319,7 +319,7 @@ def train():
                 p1_action = brain.action(old_state_p1)
                 p2_action = brain.action(old_state_p2)
 
-                p1_next_state, p1_reward,p2_next_state, p2_reward,done,_= game.step(p1_action, p2_action)
+                p1_next_state, p1_reward,p2_next_state, p2_reward,done,_,_= game.step(p1_action, p2_action)
 
                 move_counter += 1
                 move+=1
@@ -384,6 +384,8 @@ def train():
             loss_string = str(loss)
             loss_string = loss_string[7:len(loss_string)]
             loss_value = loss_string.split(',')[0]
+
+            print('%d Episode: Finished after %d steps' % (game_counter,int(float(move_counter) / float(DISPLAY_CYCLE))))
 
             if not(mini):
                 p1_winrate=-1

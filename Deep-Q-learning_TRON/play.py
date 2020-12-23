@@ -3,6 +3,7 @@ from tron.window import Window
 from Net.ACNet import Net
 from util import *
 from games.ACKTR import Brain
+from Net.DQNNet import Net as DQNNET
 
 import random
 
@@ -43,7 +44,7 @@ def printGameResults(game):
 
 def main():
     pygame.init()
-    rating=True
+    rating=False
     iter=30
     actor_critic = Net()  # 신경망 객체 생성
     global_brain = Brain(actor_critic, acktr=True)
@@ -55,6 +56,10 @@ def main():
     global_brain2.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player3.bak'))
     global_brain2.actor_critic.eval()
 
+    DQN=DQNNET()
+    DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
+    DQN.eval()
+
     if rating:
         nullgame=0
         p1_win=0
@@ -62,20 +67,21 @@ def main():
 
         for i in range(iter):
 
-            game = make_game(True, False)
+            game = make_game(True, True)
             pygame.mouse.set_visible(False)
             window = None
 
-            game.main_loop(global_brain.actor_critic, pop_up, window, global_brain2.actor_critic)
+            game.main_loop(global_brain.actor_critic, pop_up, window, DQN)
             if(game.winner is None):
                 nullgame+=1
+
 
             elif(game.winner ==1 ):
                 p1_win+=1
             else:
                 p2_win+=1
 
-        print("Player 1:{} \n Player 2:{}\n ",format(p1_win,p2_win))
+        print("Player 1:{} \n Player 2:{}\n ".format(p1_win,p2_win))
     else:
 
         while True:

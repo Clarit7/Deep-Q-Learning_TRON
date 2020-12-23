@@ -22,7 +22,6 @@ class Net(nn.Module):
 
     def forward(self, x):
 
-        x=x.cuda()
 
         x = self.relu(self.conv1(x))
         x = self.relu(self.conv2(x))
