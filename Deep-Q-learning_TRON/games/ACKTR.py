@@ -339,15 +339,18 @@ def train():
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
-            for i in range(PLAY_WITH_MINIMAX):
+            with torch.no_grad():
+                global_brain.actor_critic.eval()
+                if losscount % 5000 == 0:
+                    for i in range(PLAY_WITH_MINIMAX):
 
-                game = make_game(True, False)
-                game.main_loop(global_brain.actor_critic, pop_up)
+                        game = make_game(True, False)
+                        game.main_loop(global_brain.actor_critic, pop_up)
 
-                if game.winner == 1:
-                    p1_win += 1
+                        if game.winner == 1:
+                            p1_win += 1
 
-            writer.add_scalar('rating', p1_win/PLAY_WITH_MINIMAX, losscount)
+                    writer.add_scalar('rating', p1_win/PLAY_WITH_MINIMAX, losscount)
 
 
             p1_win = 0

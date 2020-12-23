@@ -50,9 +50,6 @@ def make_game(p1,p2):
         PositionPlayer(1,  ACPlayer() if p1 else MinimaxPlayer(2, "voronoi"), [x1, y1]),
         PositionPlayer(2,  ACPlayer() if p2 else MinimaxPlayer(2, "voronoi"), [x2, y2]), ])
 
-    print(type(game.pps[1]))
-    print(type(game.pps[0]))
-
     return game
 def get_reward(game,winner_len=0,loser_len=0):
 
