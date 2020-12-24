@@ -2,7 +2,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from config import *
 import torchvision.models as models
-from Net.inception import Inception3
 
 class Net(nn.Module):
 

@@ -58,14 +58,14 @@ def get_reward(game,winner_len=0,loser_len=0):
     elif game.winner == 1:
 
         if loser_len == 0 and winner_len == 0:
-            return 10,-10
+            return 10, -10
         else:
-            return 20+ 150/loser_len, -10
+            return 20 + 150/loser_len, -10
     else:
-        return -10,20
+        return -10, 20
 
         if loser_len == 0:
             return -10, 10
 
         else:
-            return -10,20+ 150/loser_len
+            return -10, 20 + 150/loser_len

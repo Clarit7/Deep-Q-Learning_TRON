@@ -19,9 +19,9 @@ folderName='save'
 UNIQUE=' -test'
 # UNIQUE=''
 
-DQN = DQNNET()
-DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
-DQN.eval()
+# DQN = DQNNET()
+# DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
+# DQN.eval()
 
 class RolloutStorage(object):
     '''Advantage 학습에 사용할 메모리 클래스'''
@@ -158,6 +158,7 @@ def train():
     advan_loss_sum1=0
 
     p1_win = 0
+    game_draw = 0
 
     ai_p1=True
     ai_p2=True
@@ -254,8 +255,8 @@ def train():
 
                 else:
 
-                    reward_np1[i] = -1 # 그 외의 경우는 보상 0 부여
-                    reward_np2[i] = -1
+                    reward_np1[i] = 0  # 그 외의 경우는 보상 0 부여
+                    reward_np2[i] = 0
 
 
             # 보상을 tensor로 변환하고, 에피소드의 총보상에 더해줌
@@ -351,6 +352,7 @@ def train():
 
 
             if(losscount%1000==0):
+
                 for i in range(PLAY_WITH_MINIMAX):
 
                     game = make_game(True, False)
@@ -358,22 +360,14 @@ def train():
 
                     if game.winner == 1:
                         p1_win += 1
-                writer.add_scalar('minimax rating', p1_win/PLAY_WITH_MINIMAX, losscount)
+                    elif game.winner is None:
+                        game_draw += 1
 
-                p1_win = 0
-
-                for i in range(PLAY_WITH_MINIMAX):
-
-                    game = make_game(True, True)
-                    game.main_loop(global_brain.actor_critic, pop_up, None, DQN,("AC","DQN"))
-
-                    if game.winner == 1:
-                            p1_win += 1
-
-                writer.add_scalar('DDQN rating', p1_win/PLAY_WITH_MINIMAX, losscount)
+                writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
 
 
             p1_win = 0
+            game_draw = 0
             act_loss_sum1 =0
             entropy_sum1 =0
             val_loss_sum1 =0
