@@ -71,7 +71,7 @@ def main():
             pygame.mouse.set_visible(False)
             window = None
 
-            game.main_loop(global_brain.actor_critic, pop_up, window, DQN)
+            game.main_loop(global_brain.actor_critic, pop_up, window, DQN,("AC","DQN"))
             if(game.winner is None):
                 nullgame+=1
 
@@ -89,8 +89,6 @@ def main():
             pygame.mouse.set_visible(False)
 
             window = Window(game, 40)
-            # displayGameMenu(window, game)
-            window=None
 
             game.main_loop(global_brain.actor_critic,pop_up,window,global_brain2.actor_critic)
             printGameResults(game)

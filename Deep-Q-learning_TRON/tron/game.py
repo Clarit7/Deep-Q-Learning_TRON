@@ -247,7 +247,7 @@ class Game:
 
         return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0
 
-    def main_loop(self,model, pop=None,window=None,model2=None):
+    def main_loop(self,model, pop=None,window=None,model2=None,condition=None):
 
         if window:
             window.render_map(self.map())
@@ -265,14 +265,28 @@ class Game:
             map=self.map()
 
             if(pop == None):
-                action1 = model.act(torch.tensor(np.reshape(map.state_for_player(1), (1, 1, map.state_for_player(1).shape[0],
-                                                                                      map.state_for_player(1).shape[1]))).float())
-                action2 = model2.act(torch.tensor(np.reshape(map.state_for_player(2), (1, 1, map.state_for_player(2).shape[0],
-                                                                                      map.state_for_player(2).shape[1]))).float())
+                with torch.no_grad():
+                    action1 = model.act(torch.tensor(np.reshape(map.state_for_player(1), (1, 1, map.state_for_player(1).shape[0],
+                                                                                          map.state_for_player(1).shape[1]))).float())
+                    action2 = model2.act(torch.tensor(np.reshape(map.state_for_player(2), (1, 1, map.state_for_player(2).shape[0],
+                                                                                          map.state_for_player(2).shape[1]))).float())
 
             else:
-                action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
-                action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
+                if(condition):
+                    with torch.no_grad():
+                        action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
+
+                        if condition[1]=="DQN":
+                            action2 = model2.act(
+                                torch.tensor(np.reshape(map.state_for_player(2), (1, 1, map.state_for_player(2).shape[0],
+                                                                                  map.state_for_player(2).shape[1]))).float())
+                        elif condition[1]=="AC":
+                            action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
+
+                else:
+                    action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
+                    action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
+
 
             if not self.next_frame(action1,action2,window):
                 break

@@ -1,43 +1,58 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from config import *
-
+import torchvision.models as models
+from Net.inception import Inception3
 
 class Net(nn.Module):
 
     def __init__(self):
         super(Net, self).__init__()
 
-
+        # self.inception=Inception3().cuda()
         self.conv1 = nn.Conv2d(3, 32, 6)
         self.conv2 = nn.Conv2d(32, 64, 3)
 
-        self.fc1 = nn.Linear(64 * 5* 5, 64)
+        self.fc1 = nn.Linear(64*5*5, 2048)
+        self.fc2 = nn.Linear(2048, 1024)
+        self.fc3 = nn.Linear(1024, 256)
+        self.fc4 = nn.Linear(256, 128)
 
-        self.actor1 = nn.Linear(64, 64)
+
+
+        self.actor1 = nn.Linear(128, 64)
         self.actor2 = nn.Linear(64, 4)
 
-        self.critic1 = nn.Linear(64, 64)
-        self.critic2 = nn.Linear(64, 1)
+        self.critic1 = nn.Linear(128, 64)
+        self.critic2 = nn.Linear(64, 16)
+        self.critic3 = nn.Linear(16, 1)
 
-        self.dropout = nn.Dropout(p=0.3)
+        self.dropout = nn.Dropout(p=0.4)
+        self.activation = self.mish
 
+        # self.activation=torch.tanh
     def forward(self, x):
         '''신경망 순전파 계산을 정의'''
 
         x = x.to(device)
+        #
+        x = self.activation(self.conv1(x))
+        x = self.activation(self.conv2(x))
+        # print(x.size())
+        # x = self.inception(x)
 
-        x = torch.tanh(self.conv1(x))
-        x = torch.tanh(self.conv2(x))
+        # print(x.size())
+        x = x.view(-1, 64*5*5)
+        x = self.dropout(self.activation(self.fc1(x)))
+        x = self.dropout(self.activation(self.fc2(x)))
+        x = self.dropout(self.activation(self.fc3(x)))
+        x = self.dropout(self.activation(self.fc4(x)))
 
-        x = x.view(-1, 64 * 5 * 5)
+        actor_output = self.actor2(self.activation(self.actor1(x)))
 
-        x = self.dropout(torch.tanh(self.fc1(x)))
+        critic_output = self.critic2(self.activation(self.critic1(x)))
+        critic_output = self.critic3(self.activation(critic_output))
 
-        actor_output = self.actor2(torch.tanh(self.actor1(x)))
-        critic_output = self.critic2(torch.tanh(self.critic1(x)))
-        #actor_output = actor_output.to('cpu') # Why???
-        #critic_output = critic_output.to('cpu')
 
         return critic_output, actor_output
 
@@ -72,3 +87,6 @@ class Net(nn.Module):
         entropy = -(log_probs * probs).sum(-1).mean()
 
         return value, action_log_probs, entropy
+
+    def mish(self, x):
+        return x * torch.tanh(F.softplus(x))

@@ -2,7 +2,7 @@ import torch
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-GAMMA = 0.99  # 시간할인율
+GAMMA = 0.9  # 시간할인율
 #DDQN
 BATCH_SIZE=32
 

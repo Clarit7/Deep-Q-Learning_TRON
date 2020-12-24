@@ -49,7 +49,6 @@ def make_game(p1,p2):
     game = Game(MAP_WIDTH, MAP_HEIGHT, [
         PositionPlayer(1,  ACPlayer() if p1 else MinimaxPlayer(2, "voronoi"), [x1, y1]),
         PositionPlayer(2,  ACPlayer() if p2 else MinimaxPlayer(2, "voronoi"), [x2, y2]), ])
-
     return game
 def get_reward(game,winner_len=0,loser_len=0):
 
@@ -61,10 +60,12 @@ def get_reward(game,winner_len=0,loser_len=0):
         if loser_len == 0 and winner_len == 0:
             return 10,-10
         else:
-            return 10+ 150/loser_len, -10
+            return 20+ 150/loser_len, -10
     else:
+        return -10,20
+
         if loser_len == 0:
             return -10, 10
 
         else:
-            return -10,10+ 150/loser_len
+            return -10,20+ 150/loser_len

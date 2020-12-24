@@ -3,6 +3,7 @@ from Net.ACNet import Net
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
+from Net.DQNNet import Net as DQNNET
 import pygame
 from tron.window import Window
 
@@ -13,6 +14,14 @@ from config import *
 
 
 minimax = MinimaxPlayer(2, 'voronoi')
+folderName='save'
+# UNIQUE=' -mish'
+UNIQUE=' -test'
+# UNIQUE=''
+
+DQN = DQNNET()
+DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
+DQN.eval()
 
 class RolloutStorage(object):
     '''Advantage 학습에 사용할 메모리 클래스'''
@@ -126,9 +135,9 @@ class Brain(object):
         # 결합 가중치 수정
         total_loss.backward()  # 역전파 계산
 
-        if self.acktr == False:
-            nn.utils.clip_grad_norm_(self.actor_critic.parameters(),
-                                     self.max_grad_norm)
+        # if self.acktr == False:
+        #     nn.utils.clip_grad_norm_(self.actor_critic.parameters(),
+        #                              self.max_grad_norm)
 
         self.optimizer.step()  # 결합 가중치 수정
 
@@ -156,7 +165,7 @@ def train():
     envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
 
     eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-step ' + str(
-        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES)
+        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + UNIQUE
 
     writer = SummaryWriter(eventid)
 
@@ -245,8 +254,8 @@ def train():
 
                 else:
 
-                    reward_np1[i] = 1 # 그 외의 경우는 보상 0 부여
-                    reward_np2[i] = 1
+                    reward_np1[i] = -1 # 그 외의 경우는 보상 0 부여
+                    reward_np2[i] = -1
 
 
             # 보상을 tensor로 변환하고, 에피소드의 총보상에 더해줌
@@ -339,18 +348,29 @@ def train():
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
-            with torch.no_grad():
-                global_brain.actor_critic.eval()
-                if losscount % 5000 == 0:
-                    for i in range(PLAY_WITH_MINIMAX):
 
-                        game = make_game(True, False)
-                        game.main_loop(global_brain.actor_critic, pop_up)
 
-                        if game.winner == 1:
+            if(losscount%1000==0):
+                for i in range(PLAY_WITH_MINIMAX):
+
+                    game = make_game(True, False)
+                    game.main_loop(global_brain.actor_critic, pop_up)
+
+                    if game.winner == 1:
+                        p1_win += 1
+                writer.add_scalar('minimax rating', p1_win/PLAY_WITH_MINIMAX, losscount)
+
+                p1_win = 0
+
+                for i in range(PLAY_WITH_MINIMAX):
+
+                    game = make_game(True, True)
+                    game.main_loop(global_brain.actor_critic, pop_up, None, DQN,("AC","DQN"))
+
+                    if game.winner == 1:
                             p1_win += 1
 
-                    writer.add_scalar('rating', p1_win/PLAY_WITH_MINIMAX, losscount)
+                writer.add_scalar('DDQN rating', p1_win/PLAY_WITH_MINIMAX, losscount)
 
 
             p1_win = 0
