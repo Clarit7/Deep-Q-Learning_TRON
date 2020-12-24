@@ -163,8 +163,8 @@ def train(m, r, p, v):
 
     envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
 
-    eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-step ' + str(
-        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + UNIQUE
+    eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
+        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + UNIQUE + '-model ' + str(m) + '-reward ' + str(v)
 
     writer = SummaryWriter(eventid)
 
