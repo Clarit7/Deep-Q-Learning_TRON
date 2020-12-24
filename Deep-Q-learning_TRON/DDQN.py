@@ -3,7 +3,7 @@ import os
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-from util import *
+from tron.util import *
 from Net.DQNNet import Net
 
 # General parameters
@@ -34,10 +34,9 @@ UPDATE_EVERY = 4
 GAME_CYCLE = 20
 DISPLAY_CYCLE = GAME_CYCLE
 
+
 class Agent():
     def __init__(self):
-
-
         """Initialize an Agent object.
 
                Params
@@ -74,6 +73,7 @@ class Agent():
         self.steps=0
 
         return out_loss
+
     def step(self, state, action, reward, next_step, done):
         # Save experience in replay memory
         self.memory.add(state, action, reward, next_step, done)
@@ -91,7 +91,6 @@ class Agent():
                 self.steps += 1
                 self.learn(experience, GAMMA)
 
-
     def action(self,game_map):
 
         """Returns action for given state as per current policy
@@ -104,7 +103,7 @@ class Agent():
 
         self.qnetwork_local.eval()
         with torch.no_grad():
-            action_values = self.qnetwork_local(game_map)
+            action_values = self.qnetwork_local(game_map.to(device))
         self.qnetwork_local.train()
 
         # Epsilon -greedy action selction
@@ -208,8 +207,6 @@ class ReplayBuffer:
         return len(self.memory)
 
 
-
-
 def train():
     writer = SummaryWriter('runs/Double DQN')
 
@@ -227,11 +224,8 @@ def train():
     minimax_match=0
     mini=False
 
-
-
-
-
     brain = Agent()
+
     while True:
 
         # Initialize the game cycle parameters
@@ -273,14 +267,14 @@ def train():
             '''
 
             # Initialize the starting positions
-            x1 = random.randint(0,MAP_WIDTH-1)
-            y1 = random.randint(0,MAP_HEIGHT-1)
-            x2 = random.randint(0,MAP_WIDTH-1)
-            y2 = random.randint(0,MAP_HEIGHT-1)
+            x1 = random.randint(0, MAP_WIDTH-1)
+            y1 = random.randint(0, MAP_HEIGHT-1)
+            x2 = random.randint(0, MAP_WIDTH-1)
+            y2 = random.randint(0, MAP_HEIGHT-1)
 
-            while x1==x2 and y1==y2:
-                x1 = random.randint(0,MAP_WIDTH-1)
-                y1 = random.randint(0,MAP_HEIGHT-1)
+            while x1 == x2 and y1 == y2:
+                x1 = random.randint(0, MAP_WIDTH-1)
+                y1 = random.randint(0, MAP_HEIGHT-1)
             # Initialize the game
 
             player1 = ACPlayer()
@@ -313,16 +307,16 @@ def train():
             done=False
             move = 0
 
-            while not(done):
-                brain.epsilon=epsilon
+            while not done:
+                brain.epsilon = epsilon
 
                 p1_action = brain.action(old_state_p1)
                 p2_action = brain.action(old_state_p2)
 
-                p1_next_state, p1_reward,p2_next_state, p2_reward,done,_,_= game.step(p1_action, p2_action)
+                p1_next_state, p1_reward,p2_next_state, p2_reward, done, _, _ = game.step(p1_action, p2_action)
 
                 move_counter += 1
-                move+=1
+                move += 1
 
                 # p1_next_state = pop_up(p1_next_state)
                 # p1_next_state = np.reshape(p1_next_state, (1, -1, p1_next_state.shape[1], p1_next_state.shape[2]))
@@ -359,8 +353,6 @@ def train():
                 old_state_p1 = p1_next_state
                 old_state_p2 = p2_next_state
 
-
-
         nouv_epsilon = epsilon * DECAY_RATE
         if nouv_epsilon > ESPILON_END:
             epsilon = nouv_epsilon
@@ -370,10 +362,7 @@ def train():
 
             # Update exploration rate
 
-
         # Compute the loss
-
-
         # Display results
         # Update bak
 
@@ -397,8 +386,8 @@ def train():
             writer.add_scalar('Duration', (float(move_counter) / float(DISPLAY_CYCLE)), game_counter)
             writer.add_scalar('Win rate', p1_winrate, game_counter)
 
-
             move_counter = 0
+
 
 if __name__ == "__main__":
     train()

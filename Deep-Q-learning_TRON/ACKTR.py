@@ -1,17 +1,14 @@
-import torch.nn as nn
-from Net.ACNet import Net
+from Net.ACNet import *
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
-from Net.DQNNet import Net as DQNNET
-import pygame
-from tron.window import Window
+# from Net.DQNNet import Net as DQNNET
 
-from kfac import KFACOptimizer
-from util import *
-
+from Net.kfac import KFACOptimizer
+from tron.util import *
 from config import *
 
+import argparse
 
 minimax = MinimaxPlayer(2, 'voronoi')
 folderName='save'
@@ -22,6 +19,7 @@ UNIQUE=' -test'
 # DQN = DQNNET()
 # DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
 # DQN.eval()
+
 
 class RolloutStorage(object):
     '''Advantage 학습에 사용할 메모리 클래스'''
@@ -64,11 +62,13 @@ class RolloutStorage(object):
 
 # 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
 class Brain(object):
-    def __init__(self, actor_critic, acktr=False):
+    def __init__(self, actor_critic, p, v, acktr=False):
         self.actor_critic = actor_critic.to(device)  # actor_critic은 Net 클래스로 구현한 신경망
         #self.optimizer = optim.RMSprop(self.actor_critic.parameters(), lr=lr, eps=eps, alpha=alpha)
 
         self.acktr = acktr
+        self.policy_loss_coef = policy_loss_coef if p is None else p
+        self.value_loss_coef = value_loss_coef if v is None else v
 
         if acktr:
             self.optimizer = KFACOptimizer(self.actor_critic)
@@ -144,18 +144,16 @@ class Brain(object):
         return total_loss,value_loss,action_gain,entropy,action_log_probs.mean(),radvantages
 
 
-
-def train():
+def train(m, r, p, v):
     '''실행 엔트리 포인트'''
-
-    max=0
-    min=0
+    max_val = 0
+    min_loss = 0
     total_loss_sum1 = 0
     val_loss_sum1 = 0
     entropy_sum1 = 0
     act_loss_sum1 = 0
-    prob1_loss_sum1=0
-    advan_loss_sum1=0
+    prob1_loss_sum1 = 0
+    advan_loss_sum1 = 0
 
     p1_win = 0
     game_draw = 0
@@ -170,9 +168,16 @@ def train():
 
     writer = SummaryWriter(eventid)
 
-    actor_critic = Net()  # 신경망 객체 생성
-    global_brain = Brain(actor_critic, acktr=True)
+    print(m)
 
+    if m == "2":
+        actor_critic = Net2()  # 신경망 객체 생성
+    elif m == "3":
+        actor_critic = Net3()
+    else:
+        actor_critic = Net()
+
+    global_brain = Brain(actor_critic, p, v, acktr=True)
 
     rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
@@ -207,11 +212,19 @@ def train():
     # advanced 학습에 사용되는 객체 rollouts 첫번째 상태에 현재 상태를 저장
     rollouts1.observations[0].copy_(current_obs1)
     rollouts2.observations[0].copy_(current_obs2)
-    gamecount=0
-    losscount=0
-    duration=0
+    gamecount = 0
+    losscount = 0
+    duration = 0
+
+    if r == "2":
+        reward_constants = reward_cons2
+    elif r == "3":
+        reward_constants = reward_cons3
+    else:
+        reward_constants = reward_cons1
+
     # 1 에피소드에 해당하는 반복문
-    while(True):  # 전체 for문
+    while True:  # 전체 for문
         # advanced 학습 대상이 되는 각 단계에 대해 계산
         for step in range(NUM_ADVANCED_STEP):
             # 행동을 선택
@@ -225,7 +238,6 @@ def train():
 
             # 한 단계를 실행
             for i in range(NUM_PROCESSES):
-
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
@@ -235,16 +247,15 @@ def train():
                 each_step2[i] += 1
 
                 if done_np[i]:
-
-                    reward_np1[i],reward_np2[i]=get_reward(envs[i],winner_len,loser_len)
-                    if (i == 0):
+                    reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
+                    if i == 0:
                         gamecount += 1
                         duration += each_step1[i]+loser_len
 
-                        if(gamecount % SHOW_ITER==0):
+                        if gamecount % SHOW_ITER == 0:
                             print('%d Episode: Finished after %d steps' % (gamecount, each_step1[i]))
                             writer.add_scalar('Duration', duration/SHOW_ITER, gamecount)
-                            duration=0
+                            duration = 0
 
                     envs[i] = make_game(ai_p1,ai_p2)
 
@@ -252,12 +263,9 @@ def train():
                     obs_np2[i] = envs[i].map().state_for_player(2)
                     each_step1[i] = 0
                     each_step2[i] = 0
-
                 else:
-
                     reward_np1[i] = 0  # 그 외의 경우는 보상 0 부여
                     reward_np2[i] = 0
-
 
             # 보상을 tensor로 변환하고, 에피소드의 총보상에 더해줌
             reward1 = torch.from_numpy(reward_np1).float()
@@ -268,7 +276,6 @@ def train():
 
             # 각 실행 환경을 확인하여 done이 true이면 mask를 0으로, false이면 mask를 1로
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done_np])
-
 
             # current_obs를 업데이트
             obs1 = [pop_up(obs_np1[i]) for i in range(NUM_PROCESSES)]
@@ -303,18 +310,16 @@ def train():
         rollouts2.compute_returns(next_value2)
 
         # 신경망 및 rollout 업데이트
-        loss1,val1,act1,entro1,prob1,advan1=global_brain.update(rollouts1)
+        loss1, val1, act1, entro1, prob1, advan1 = global_brain.update(rollouts1)
         global_brain.update(rollouts2)
-        losscount+=1
+        losscount += 1
 
-
-
-        act_loss_sum1+=act1
-        entropy_sum1+=entro1
-        val_loss_sum1+=val1
-        total_loss_sum1+=loss1
-        prob1_loss_sum1+=prob1
-        advan_loss_sum1+=advan1
+        act_loss_sum1 += act1
+        entropy_sum1 += entro1
+        val_loss_sum1 += val1
+        total_loss_sum1 += loss1
+        prob1_loss_sum1 += prob1
+        advan_loss_sum1 += advan1
 
         # if(gamecount>2000):
         #     pygame.init()
@@ -325,19 +330,18 @@ def train():
         #
         #     game.main_loop(global_brain.actor_critic, pop_up, window)
 
+        if losscount%SHOW_ITER == 0:
+            total_loss_sum1 = total_loss_sum1 / SHOW_ITER
+            val_loss_sum1 = val_loss_sum1 / SHOW_ITER
+            act_loss_sum1 = act_loss_sum1 / SHOW_ITER
+            entropy_sum1 = entropy_sum1 / SHOW_ITER
+            prob1_loss_sum1 /= SHOW_ITER
+            advan_loss_sum1 /= SHOW_ITER
 
-        if(losscount%SHOW_ITER==0):
-            total_loss_sum1 =total_loss_sum1 / SHOW_ITER
-            val_loss_sum1=val_loss_sum1 / SHOW_ITER
-            act_loss_sum1=act_loss_sum1 / SHOW_ITER
-            entropy_sum1= entropy_sum1 / SHOW_ITER
-            prob1_loss_sum1 /=SHOW_ITER
-            advan_loss_sum1 /=SHOW_ITER
-
-            if(val_loss_sum1>max):
-                max=val_loss_sum1
-            if (total_loss_sum1 < min):
-                min=act_loss_sum1
+            if val_loss_sum1 > max_val:
+                max_val = val_loss_sum1
+            if total_loss_sum1 < min_loss:
+                min_loss = act_loss_sum1
 
             torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'ACKTR_player.bak')
             # torch.save(global_brain2.actor_critic.state_dict(), 'ais/a3c/' + 'player_2.bak')
@@ -349,12 +353,8 @@ def train():
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
-
-
-            if(losscount%1000==0):
-
+            if losscount%1000 == 0:
                 for i in range(PLAY_WITH_MINIMAX):
-
                     game = make_game(True, False)
                     game.main_loop(global_brain.actor_critic, pop_up)
 
@@ -365,24 +365,36 @@ def train():
 
                 writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
 
-
             p1_win = 0
             game_draw = 0
-            act_loss_sum1 =0
-            entropy_sum1 =0
-            val_loss_sum1 =0
-            total_loss_sum1 =0
-            prob1_loss_sum1=0
-            advan_loss_sum1=0
-
+            act_loss_sum1 = 0
+            entropy_sum1 = 0
+            val_loss_sum1 = 0
+            total_loss_sum1 = 0
+            prob1_loss_sum1 = 0
+            advan_loss_sum1 = 0
 
         rollouts1.after_update()
         rollouts2.after_update()
 
-# main 실행
 
 def main():
-    train()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-m', required=False, help='model structure number')
+    parser.add_argument('-r', required=False, help='reward condition number')
+
+    parser.add_argument('-p', required=False, help='policy coefficient')
+    parser.add_argument('-v', required=False, help='value coefficient')
+
+    args = parser.parse_args()
+
+    model_number = args.m if args.m is not None else 0
+    reward_number = args.r if args.r is not None else 0
+    policy_coef = args.p if args.p is not None else 0
+    value_coef = args.v if args.v is not None else 0
+
+    train(model_number, reward_number, policy_coef, value_coef)
 
 
 if __name__ == "__main__":

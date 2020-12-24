@@ -112,6 +112,19 @@ if historyStep +1 == len(game.history)-1:
     terminal = True
 ```
 
+## Args
+```
+-m : model number(int). For example, 2 means 2nd model in neural net file(/Net/ACNet.py, /Net/DQNNet.py).
+-r : reward set number(int). For example, 2 means 2nd combination of reward constants set in config.py
+-p : policy coefficient(float)
+-v : value coefficient(float)
+```
+
+* example
+```
+python ACKTR.py -m 2 -r 2 -p 1.2 -v 0.6
+```
+
 ## Bonus video
 
 For fun I made an humoristic video in french trying to simply explain the deep reinforcment Q-learning technique used here to train the AIs.

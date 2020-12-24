@@ -50,22 +50,19 @@ def make_game(p1,p2):
         PositionPlayer(1,  ACPlayer() if p1 else MinimaxPlayer(2, "voronoi"), [x1, y1]),
         PositionPlayer(2,  ACPlayer() if p2 else MinimaxPlayer(2, "voronoi"), [x2, y2]), ])
     return game
-def get_reward(game,winner_len=0,loser_len=0):
 
+
+def get_reward(game, constants, winner_len=0, loser_len=0):
     if game.winner is None:
-        return 0,0
+        return 0, 0
 
     elif game.winner == 1:
-
         if loser_len == 0 and winner_len == 0:
-            return 10, -10
+            return constants[0], constants[1]
         else:
-            return 20 + 150/loser_len, -10
+            return constants[2] + constants[3]/loser_len, constants[1]
     else:
-        return -10, 20
-
         if loser_len == 0:
-            return -10, 10
-
+            return constants[1], constants[0]
         else:
-            return -10, 20 + 150/loser_len
+            return constants[1], constants[2] + constants[3]/loser_len

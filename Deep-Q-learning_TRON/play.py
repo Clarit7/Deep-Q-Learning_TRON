@@ -1,22 +1,23 @@
 import pygame
 from tron.window import Window
 from Net.ACNet import Net
-from util import *
-from games.ACKTR import Brain
+from tron.util import *
+from ACKTR import Brain
 from Net.DQNNet import Net as DQNNET
 
 import random
 
-folderName='games/save'
+folderName = 'games/save'
 
-def randomPosition(width, height):
+
+def random_position(width, height):
     x = random.randint(0, width - 1)
     y = random.randint(0, height - 1)
 
     return [x, y]
 
 
-def displayGameMenu(window, game):
+def display_game_menu(window, game):
     window.screen.fill([0, 0, 0])
 
     myimage = pygame.image.load("asset/TronTitle.png")
@@ -35,7 +36,7 @@ def displayGameMenu(window, game):
                 break
 
 
-def printGameResults(game):
+def print_game_results(game):
     if game.winner is None:
         print("It's a draw!")
     else:
@@ -61,29 +62,26 @@ def main():
     DQN.eval()
 
     if rating:
-        nullgame=0
-        p1_win=0
-        p2_win=0
+        nullgame = 0
+        p1_win = 0
+        p2_win = 0
 
         for i in range(iter):
-
             game = make_game(True, True)
             pygame.mouse.set_visible(False)
             window = None
 
-            game.main_loop(global_brain.actor_critic, pop_up, window, DQN,("AC","DQN"))
-            if(game.winner is None):
+            game.main_loop(global_brain.actor_critic, pop_up, window, DQN, ("AC", "DQN"))
+
+            if game.winner is None:
                 nullgame+=1
-
-
-            elif(game.winner ==1 ):
+            elif game.winner ==1:
                 p1_win+=1
             else:
                 p2_win+=1
 
         print("Player 1:{} \n Player 2:{}\n ".format(p1_win,p2_win))
     else:
-
         while True:
             game = make_game(True, False)
             pygame.mouse.set_visible(False)
@@ -91,8 +89,7 @@ def main():
             window = Window(game, 40)
 
             game.main_loop(global_brain.actor_critic,pop_up,window,global_brain2.actor_critic)
-            printGameResults(game)
-
+            print_game_results(game)
 
 
 if __name__ == '__main__':

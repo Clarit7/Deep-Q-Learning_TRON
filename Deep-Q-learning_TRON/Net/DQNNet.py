@@ -4,7 +4,6 @@ from config import *
 
 
 class Net(nn.Module):
-
     def __init__(self):
         super(Net, self).__init__()
         self.gamma = GAMMA
@@ -21,8 +20,6 @@ class Net(nn.Module):
         self.fc2 = nn.Linear(256, 4)
 
     def forward(self, x):
-
-
         x = self.relu(self.conv1(x))
         x = self.relu(self.conv2(x))
         x = x.view(-1, 64 * 5 * 5)
@@ -33,7 +30,6 @@ class Net(nn.Module):
         return x
 
     def act(self, x):
-
         output = self(x)
         return torch.argmax(output, dim=1)
 
