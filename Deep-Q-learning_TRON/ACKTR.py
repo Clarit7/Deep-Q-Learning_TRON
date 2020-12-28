@@ -12,9 +12,7 @@ import argparse
 
 minimax = MinimaxPlayer(2, 'voronoi')
 folderName='save'
-# UNIQUE=' -mish'
-UNIQUE=' -test'
-# UNIQUE=''
+
 
 # DQN = DQNNET()
 # DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
@@ -62,13 +60,14 @@ class RolloutStorage(object):
 
 # 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
 class Brain(object):
-    def __init__(self, actor_critic, p, v, acktr=False):
+    def __init__(self, actor_critic,args, acktr=False):
         self.actor_critic = actor_critic.to(device)  # actor_critic은 Net 클래스로 구현한 신경망
         #self.optimizer = optim.RMSprop(self.actor_critic.parameters(), lr=lr, eps=eps, alpha=alpha)
 
         self.acktr = acktr
-        self.policy_loss_coef = policy_loss_coef if p is None else p
-        self.value_loss_coef = value_loss_coef if v is None else v
+
+        self.policy_loss_coef = policy_loss_coef if args.p is None else float(args.p)
+        self.value_loss_coef = value_loss_coef if args.v is None else float(args.v)
 
         if acktr:
             self.optimizer = KFACOptimizer(self.actor_critic)
@@ -144,7 +143,7 @@ class Brain(object):
         return total_loss,value_loss,action_gain,entropy,action_log_probs.mean(),radvantages
 
 
-def train(m, r, p, v):
+def train(args):
     '''실행 엔트리 포인트'''
     max_val = 0
     min_loss = 0
@@ -160,24 +159,28 @@ def train(m, r, p, v):
 
     ai_p1=True
     ai_p2=True
+    p= "1" if args.p is None else args.p
+    v = "1" if args.v is None else args.v
+    m = "1" if args.m is None else args.m
+    r = "1" if args.r is None else args.r
+    unique= "" if args.u is None else args.u
 
     envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
 
     eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
-        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + UNIQUE + '-model ' + str(m) + '-reward ' + str(r)
+        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + unique + '-model ' + m + '-reward ' + r
 
     writer = SummaryWriter(eventid)
 
-    print(m)
 
-    if m == "2":
+    if args.m == "2":
         actor_critic = Net2()  # 신경망 객체 생성
-    elif m == "3":
+    elif args.m == "3":
         actor_critic = Net3()
     else:
         actor_critic = Net()
 
-    global_brain = Brain(actor_critic, p, v, acktr=True)
+    global_brain = Brain(actor_critic,args, acktr=True)
 
     rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
@@ -216,12 +219,14 @@ def train(m, r, p, v):
     losscount = 0
     duration = 0
 
-    if r == "2":
+    if args.r == "2":
         reward_constants = reward_cons2
-    elif r == "3":
+    elif args.r == "3":
         reward_constants = reward_cons3
     else:
         reward_constants = reward_cons1
+
+
 
     # 1 에피소드에 해당하는 반복문
     while True:  # 전체 for문
@@ -264,8 +269,8 @@ def train(m, r, p, v):
                     each_step1[i] = 0
                     each_step2[i] = 0
                 else:
-                    reward_np1[i] = 0  # 그 외의 경우는 보상 0 부여
-                    reward_np2[i] = 0
+                    reward_np1[i] = -1  # 그 외의 경우는 보상 0 부여
+                    reward_np2[i] = -1
 
             # 보상을 tensor로 변환하고, 에피소드의 총보상에 더해줌
             reward1 = torch.from_numpy(reward_np1).float()
@@ -343,7 +348,7 @@ def train(m, r, p, v):
             if total_loss_sum1 < min_loss:
                 min_loss = act_loss_sum1
 
-            torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'ACKTR_player.bak')
+            torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'ACKTR_player'+m + unique +'.bak')
             # torch.save(global_brain2.actor_critic.state_dict(), 'ais/a3c/' + 'player_2.bak')
 
             writer.add_scalar('Training loss', total_loss_sum1, losscount)
@@ -353,7 +358,7 @@ def train(m, r, p, v):
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
-            if losscount%1000 == 0:
+            if losscount%200 == 0:
                 for i in range(PLAY_WITH_MINIMAX):
                     game = make_game(True, False)
                     game.main_loop(global_brain.actor_critic, pop_up)
@@ -386,15 +391,11 @@ def main():
 
     parser.add_argument('-p', required=False, help='policy coefficient')
     parser.add_argument('-v', required=False, help='value coefficient')
+    parser.add_argument('-u', required=False, help='unique string')
 
     args = parser.parse_args()
 
-    model_number = args.m if args.m is not None else 0
-    reward_number = args.r if args.r is not None else 0
-    policy_coef = args.p if args.p is not None else 0
-    value_coef = args.v if args.v is not None else 0
-
-    train(model_number, reward_number, policy_coef, value_coef)
+    train(args)
 
 
 if __name__ == "__main__":

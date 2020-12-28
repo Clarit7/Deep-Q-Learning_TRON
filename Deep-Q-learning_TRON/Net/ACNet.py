@@ -9,10 +9,12 @@ class Net(nn.Module):
         super(Net, self).__init__()
 
         # self.inception=Inception3().cuda()
-        self.conv1 = nn.Conv2d(3, 32, 6)
-        self.conv2 = nn.Conv2d(32, 64, 3)
+        self.conv1 = nn.Conv2d(3, 32, 5,padding=2)
 
-        self.fc1 = nn.Linear(64*5*5, 2048)
+        self.conv2 = nn.Conv2d(32, 64, 5)
+
+
+        self.fc1 = nn.Linear(64*8*8, 2048)
         self.fc2 = nn.Linear(2048, 1024)
         self.fc3 = nn.Linear(1024, 256)
         self.fc4 = nn.Linear(256, 128)
@@ -39,7 +41,7 @@ class Net(nn.Module):
         # x = self.inception(x)
 
         # print(x.size())
-        x = x.view(-1, 64*5*5)
+        x = x.view(-1, 64*8*8)
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))
         x = self.dropout(self.activation(self.fc3(x)))
@@ -94,10 +96,15 @@ class Net2(Net):
         super(Net, self).__init__()
 
         # self.inception=Inception3().cuda()
-        self.conv1 = nn.Conv2d(3, 32, 6)
-        self.conv2 = nn.Conv2d(32, 64, 3)
+        self.conv1 = nn.Conv2d(3, 32, 3,padding=1)
+        self.conv2 = nn.Conv2d(32, 64, 5,padding=2)
 
-        self.fc1 = nn.Linear(64*5*5, 2048)
+        self.pool=nn.MaxPool2d(kernel_size=2)
+        self.conv3=nn.Conv2d(64,64,7,padding=3)
+        self.pool2=nn.MaxPool2d(kernel_size=3,stride=2)
+
+
+        self.fc1 = nn.Linear(64*2*2, 2048)
         self.fc2 = nn.Linear(2048, 1024)
         self.fc3 = nn.Linear(1024, 256)
         self.fc4 = nn.Linear(256, 128)
@@ -116,14 +123,21 @@ class Net2(Net):
     def forward(self, x):
         '''신경망 순전파 계산을 정의'''
         x = x.to(device)
-        #
+
         x = self.activation(self.conv1(x))
         x = self.activation(self.conv2(x))
+
+        x = self.pool(x)
+        x = self.activation(self.conv3(x))
+        x = self.pool2(x)
+
+
         # print(x.size())
         # x = self.inception(x)
 
         # print(x.size())
-        x = x.view(-1, 64*5*5)
+
+        x = x.view(-1, 64*2*2)
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))
         x = self.dropout(self.activation(self.fc3(x)))
@@ -142,10 +156,18 @@ class Net3(Net):
         super(Net, self).__init__()
 
         # self.inception=Inception3().cuda()
-        self.conv1 = nn.Conv2d(3, 32, 6)
-        self.conv2 = nn.Conv2d(32, 64, 3)
+        self.conv1 = nn.Conv2d(3, 16, 3,padding=1)
+        self.conv2 = nn.Conv2d(16,32 , 3,padding=1)
 
-        self.fc1 = nn.Linear(64*5*5, 2048)
+        self.pool=nn.AvgPool2d(kernel_size=2)
+        self.conv3 = nn.Conv2d(32, 64, (3,1),padding=(1,3))
+        self.conv4 = nn.Conv2d(64, 64, (1,3),padding=(3,1))
+
+        self.pool2 = nn.AvgPool2d(kernel_size=3, stride=2)
+        self.conv5 = nn.Conv2d(64, 128, 5,padding=3)
+
+
+        self.fc1 = nn.Linear(128*7*7, 2048)
         self.fc2 = nn.Linear(2048, 1024)
         self.fc3 = nn.Linear(1024, 256)
         self.fc4 = nn.Linear(256, 128)
@@ -168,11 +190,14 @@ class Net3(Net):
         #
         x = self.activation(self.conv1(x))
         x = self.activation(self.conv2(x))
-        # print(x.size())
-        # x = self.inception(x)
+        x = self.pool(x)
+        x = self.activation(self.conv3(x))
+        x = self.activation(self.conv4(x))
+        x = self.pool2(x)
+        x = self.activation(self.conv5(x))
 
         # print(x.size())
-        x = x.view(-1, 64*5*5)
+        x = x.view(-1, 128*7*7)
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))
         x = self.dropout(self.activation(self.fc3(x)))

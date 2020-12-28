@@ -4,10 +4,11 @@ from Net.ACNet import Net
 from tron.util import *
 from ACKTR import Brain
 from Net.DQNNet import Net as DQNNET
+import argparse
 
 import random
 
-folderName = 'games/save'
+folderName = 'save'
 
 
 def random_position(width, height):
@@ -43,23 +44,23 @@ def print_game_results(game):
         print('Player {} wins! Duration: {}'.format(game.winner, len(game.history)))
 
 
-def main():
+def main(args):
     pygame.init()
     rating=False
     iter=30
     actor_critic = Net()  # 신경망 객체 생성
-    global_brain = Brain(actor_critic, acktr=True)
-    global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player2.bak'))
+    global_brain = Brain(actor_critic,args, acktr=True)
+    global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player1model1_reword3.bak'))
     global_brain.actor_critic.eval()
 
     actor_critic2 = Net()  # 신경망 객체 생성
-    global_brain2 = Brain(actor_critic2, acktr=True)
-    global_brain2.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player3.bak'))
+    global_brain2 = Brain(actor_critic2,args, acktr=True)
+    global_brain2.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player1model1_reword3.bak'))
     global_brain2.actor_critic.eval()
 
-    DQN=DQNNET()
-    DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
-    DQN.eval()
+    # DQN=DQNNET()
+    # DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
+    # DQN.eval()
 
     if rating:
         nullgame = 0
@@ -93,4 +94,16 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-m', required=False, help='model structure number')
+    parser.add_argument('-r', required=False, help='reward condition number')
+
+    parser.add_argument('-p', required=False, help='policy coefficient')
+    parser.add_argument('-v', required=False, help='value coefficient')
+    parser.add_argument('-u', required=False, help='unique string')
+
+    args = parser.parse_args()
+
+
+    main(args)
