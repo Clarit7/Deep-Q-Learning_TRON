@@ -96,12 +96,23 @@ class Net2(Net):
         super(Net, self).__init__()
 
         # self.inception=Inception3().cuda()
-        self.conv1 = nn.Conv2d(3, 32, 3,padding=1)
-        self.conv2 = nn.Conv2d(32, 64, 5,padding=2)
 
-        self.pool=nn.MaxPool2d(kernel_size=2)
-        self.conv3=nn.Conv2d(64,64,7,padding=3)
+
+
+        self.conv1 = nn.Conv2d(3, 32, 5,padding=2)
+
+        self.conv2 = nn.Conv2d(32, 32, 5,padding=2)
+        self.conv3 = nn.Conv2d(32, 32, 5,padding=2)
+
+        self.conv4 = nn.Conv2d(32, 32, (3,1), padding=(0,1))
+        self.conv5 = nn.Conv2d(32, 32, (1,3), padding=(1,0))
+
+        self.pool=nn.AvgPool2d(kernel_size=2)
+
+        self.conv6=nn.Conv2d(32,64,7,padding=3)
+
         self.pool2=nn.MaxPool2d(kernel_size=3,stride=2)
+
 
 
         self.fc1 = nn.Linear(64*2*2, 2048)
@@ -125,14 +136,23 @@ class Net2(Net):
         x = x.to(device)
 
         x = self.activation(self.conv1(x))
+
+        id=x
+
         x = self.activation(self.conv2(x))
+        x = self.activation(self.conv3(x)+id)
+
 
         x = self.pool(x)
-        x = self.activation(self.conv3(x))
+
+        id=x
+
+        x = self.activation(self.conv4(x))
+        x = self.activation(self.conv5(x)+id)
+
+        x = self.activation(self.conv6(x))
         x = self.pool2(x)
 
-
-        # print(x.size())
         # x = self.inception(x)
 
         # print(x.size())
