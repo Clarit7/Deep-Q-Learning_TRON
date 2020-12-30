@@ -37,21 +37,21 @@ def pop_up(map):
 
 def make_game(p1,p2,mode=None):
 
-    if mode=="piar":
+    if mode == "fair":
         point_y=random.randint(0, MAP_HEIGHT - 1)
         point_x=random.randint(0, MAP_WIDTH - 1)
 
 
-        low_bound1_x = min(0,point_x-1)
-        upper_bound1_x = max(MAP_WIDTH - 1,point_x+1)
-        low_bound1_y = min(0,point_y-1)
-        upper_bound1_y = max(MAP_HEIGHT - 1,point_y+1)
+        low_bound1_x = max(0, point_x-1)
+        upper_bound1_x = min(MAP_WIDTH - 1, point_x+1)
+        low_bound1_y = max(0, point_y-1)
+        upper_bound1_y = min(MAP_HEIGHT - 1, point_y+1)
 
-        low_bound2_x = min(0, MAP_WIDTH - point_x - 2)
-        upper_bound2_x = max(MAP_WIDTH - 1, MAP_WIDTH -point_x )
+        low_bound2_x = MAP_WIDTH - 1 - upper_bound1_x
+        upper_bound2_x = MAP_WIDTH - 1 - low_bound1_x
 
-        low_bound2_y = min(0,MAP_HEIGHT - point_y - 2)
-        upper_bound2_y = max(MAP_HEIGHT - 1, MAP_HEIGHT -point_y)
+        low_bound2_y = MAP_HEIGHT - 1 - upper_bound1_y
+        upper_bound2_y = MAP_HEIGHT - 1 - low_bound1_y
 
     else:
 
@@ -62,8 +62,8 @@ def make_game(p1,p2,mode=None):
     x1 = random.randint(low_bound1_x, upper_bound1_x)
     y1 = random.randint(low_bound1_y, upper_bound1_y)
 
-    x2 = random.randint(low_bound2_y, upper_bound2_x)
-    y2 = random.randint(low_bound2_x, upper_bound2_y)
+    x2 = random.randint(low_bound2_x, upper_bound2_x)
+    y2 = random.randint(low_bound2_y, upper_bound2_y)
 
     while x1 == x2 and y1 == y2:
         x1 = random.randint(low_bound1_x, upper_bound1_x)
