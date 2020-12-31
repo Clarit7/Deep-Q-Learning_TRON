@@ -360,7 +360,7 @@ def train(args):
 
             if losscount%200 == 0:
                 for i in range(PLAY_WITH_MINIMAX):
-                    game = make_game(True, False)
+                    game = make_game(True, False, 'fair')
                     game.main_loop(global_brain.actor_critic, pop_up)
 
                     if game.winner == 1:
