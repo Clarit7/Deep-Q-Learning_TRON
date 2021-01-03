@@ -9,7 +9,8 @@ from torch.nn import functional as F
 from memory import EpisodicReplayMemory
 from Net.ACERNet import ActorCritic
 from utils import state_to_tensor
-
+from tron.util import *
+from Net.ACNet import *
 
 # Knuth's algorithm for generating Poisson samples
 def _poisson(lmbd):
@@ -27,7 +28,6 @@ def _transfer_grads_to_shared_model(model, shared_model):
             return
         shared_param._grad = param.grad
 
-
 # Adjusts learning rate
 def _adjust_learning_rate(optimiser, lr):
     for param_group in optimiser.param_groups:
@@ -42,7 +42,7 @@ def _update_networks(args, T, model, shared_model, shared_average_model, loss, o
     Calculate gradients for gradient descent on loss functions
     Note that math comments follow the paper, which is formulated for gradient ascent
     """
-    loss.backward()
+    loss.backward(retain_graph=True)
     # Gradient L2 normalisation
     nn.utils.clip_grad_norm_(model.parameters(), args.max_gradient_norm)
 
@@ -149,17 +149,22 @@ def _train(args, T, model, shared_model, shared_average_model, optimiser, polici
 def train(rank, args, T, shared_model, shared_average_model, optimiser):
     torch.manual_seed(args.seed + rank)
 
-    env = gym.make(args.env)
-    env.seed(args.seed + rank)
-    model = ActorCritic(env.observation_space, env.action_space, args.hidden_size)
+    env = make_game(True, True)
+    # env.seed(args.seed + rank)
+    model = Net4()
     model.train()
+
+    print("debugging point 1")
 
     if not args.on_policy:
         # Normalise memory capacity by number of training processes
-        memory = EpisodicReplayMemory(args.memory_capacity // args.num_processes, args.max_episode_length)
+        memory1 = EpisodicReplayMemory(args.memory_capacity // args.num_processes, args.max_episode_length)
+        memory2 = EpisodicReplayMemory(args.memory_capacity // args.num_processes, args.max_episode_length)
 
     t = 1  # Thread step counter
     done = True  # Start new episode
+
+    print("debugging point 2")
 
     while T.value() <= args.T_max:
         # On-policy episode loop
@@ -169,12 +174,15 @@ def train(rank, args, T, shared_model, shared_average_model, optimiser):
             # Get starting timestep
             t_start = t
 
+            print("debugging point 3")
+
             # Reset or pass on hidden state
             if done:
                 hx, avg_hx = torch.zeros(1, args.hidden_size), torch.zeros(1, args.hidden_size)
                 cx, avg_cx = torch.zeros(1, args.hidden_size), torch.zeros(1, args.hidden_size)
                 # Reset environment and done flag
-                state = state_to_tensor(env.reset())
+                env = make_game(True, True)
+                state = env.map()
                 done, episode_length = False, 0
             else:
                 # Perform truncated backpropagation-through-time (allows freeing buffers after backwards call)
@@ -184,64 +192,89 @@ def train(rank, args, T, shared_model, shared_average_model, optimiser):
             # Lists of outputs for training
             policies, Qs, Vs, actions, rewards, average_policies = [], [], [], [], [], []
 
+            print("debugging point 4")
+
             while not done and t - t_start < args.t_max:
                 # Calculate policy and values
-                policy, Q, V, (hx, cx) = model(state, (hx, cx))
-                average_policy, _, _, (avg_hx, avg_cx) = shared_average_model(state, (avg_hx, avg_cx))
+                state1 = torch.from_numpy(pop_up(env.map().state_for_player(1))).float().unsqueeze(0)
+                state2 = torch.from_numpy(pop_up(env.map().state_for_player(1))).float().unsqueeze(0)
+                policy1, Q1, V1 = model(state1)
+                policy2, Q2, V2 = model(state2)
+                average_policy1, _, _ = shared_average_model(state1)
+                average_policy2, _, _ = shared_average_model(state2)
 
                 # Sample action
-                action = torch.multinomial(policy, 1)[0, 0]
+                action1 = torch.multinomial(policy1, 1)[0, 0]
+                action2 = torch.multinomial(policy1, 1)[0, 0]
+
+                print("debugging point 5")
 
                 # Step
-                next_state, reward, done, _ = env.step(action.item())
-                next_state = state_to_tensor(next_state)
-                reward = args.reward_clip and min(max(reward, -1), 1) or reward  # Optionally clamp rewards
+                next_state1, reward1, next_state2, reward2, done, _, _ = env.step(action1.item(), action2.item())
+                next_state1 = torch.from_numpy(pop_up(next_state1)).float().unsqueeze(0)
+                next_state2 = torch.from_numpy(pop_up(next_state2)).float().unsqueeze(0)
+                reward1 = args.reward_clip and min(max(reward1, -1), 1) or reward1  # Optionally clamp rewards
+                reward2 = args.reward_clip and min(max(reward2, -1), 1) or reward2  # Optionally clamp rewards
                 done = done or episode_length >= args.max_episode_length  # Stop episodes at a max length
                 episode_length += 1  # Increase episode counter
 
                 if not args.on_policy:
                     # Save (beginning part of) transition for offline training
-                    memory.append(state, action, reward, policy.detach())  # Save just tensors
+                    memory1.append(state1, action1, reward1, policy1.detach())  # Save just tensors
+                    memory2.append(state2, action2, reward2, policy2.detach())  # Save just tensors
                 # Save outputs for online training
-                [arr.append(el) for arr, el in zip((policies, Qs, Vs, actions, rewards, average_policies),
+                [arr1.append(el1) for arr1, el1 in zip((policies, Qs, Vs, actions, rewards, average_policies),
                                                    (
-                                                   policy, Q, V, torch.LongTensor([[action]]), torch.Tensor([[reward]]),
-                                                   average_policy))]
+                                                   policy1, Q1, V1, torch.LongTensor([[action1]]), torch.Tensor([[reward1]]),
+                                                   average_policy1))]
+                [arr2.append(el2) for arr2, el2 in zip((policies, Qs, Vs, actions, rewards, average_policies),
+                                                   (
+                                                       policy2, Q2, V2, torch.LongTensor([[action2]]),
+                                                       torch.Tensor([[reward2]]),
+                                                       average_policy2))]
 
                 # Increment counters
                 t += 1
                 T.increment()
 
                 # Update state
-                state = next_state
+                state1 = next_state1
+                state2 = next_state2
+
+            print("debugging point 6")
 
             # Break graph for last values calculated (used for targets, not directly as model outputs)
             if done:
                 # Qret = 0 for terminal s
-                Qret = torch.zeros(1, 1)
-
+                Qret1 = torch.zeros(1, 1)
+                Qret2 = torch.zeros(1, 1)
                 if not args.on_policy:
                     # Save terminal state for offline training
-                    memory.append(state, None, None, None)
+                    memory1.append(state1, None, None, None)
+                    memory2.append(state2, None, None, None)
             else:
                 # Qret = V(s_i; θ) for non-terminal s
-                _, _, Qret, _ = model(state, (hx, cx))
-                Qret = Qret.detach()
+                _, Qret1, _ = model(state1)
+                _, Qret2, _ = model(state2)
+                Qret1 = Qret1.detach()
+                Qret2 = Qret2.detach()
 
             # Train the network on-policy
             _train(args, T, model, shared_model, shared_average_model, optimiser, policies, Qs, Vs, actions, rewards,
-                   Qret, average_policies)
+                   Qret1, average_policies)
+            _train(args, T, model, shared_model, shared_average_model, optimiser, policies, Qs, Vs, actions, rewards,
+                   Qret2, average_policies)
 
             # Finish on-policy episode
             if done:
                 break
 
         # Train the network off-policy when enough experience has been collected
-        if not args.on_policy and len(memory) >= args.replay_start:
+        if not args.on_policy and len(memory1) >= args.replay_start:
             # Sample a number of off-policy episodes based on the replay ratio
             for _ in range(_poisson(args.replay_ratio)):
                 # Act and train off-policy for a batch of (truncated) episode
-                trajectories = memory.sample_batch(args.batch_size, maxlen=args.t_max)
+                trajectories = memory1.sample_batch(args.batch_size, maxlen=args.t_max)
 
                 # Reset hidden state
                 hx, avg_hx = torch.zeros(args.batch_size, args.hidden_size), torch.zeros(args.batch_size,
@@ -261,8 +294,8 @@ def train(rank, args, T, shared_model, shared_average_model, optimiser):
                     old_policy = torch.cat(tuple(trajectory.policy for trajectory in trajectories[i]), 0)
 
                     # Calculate policy and values
-                    policy, Q, V, (hx, cx) = model(state, (hx, cx))
-                    average_policy, _, _, (avg_hx, avg_cx) = shared_average_model(state, (avg_hx, avg_cx))
+                    policy, Q, V = model(state)
+                    average_policy, _, _ = shared_average_model(state)
 
                     # Save outputs for offline training
                     [arr.append(el) for arr, el in
@@ -281,6 +314,7 @@ def train(rank, args, T, shared_model, shared_average_model, optimiser):
                 # Train the network off-policy
                 _train(args, T, model, shared_model, shared_average_model, optimiser, policies, Qs, Vs,
                        actions, rewards, Qret, average_policies, old_policies=old_policies)
+
         done = True
 
     env.close()

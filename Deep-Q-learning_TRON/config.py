@@ -33,6 +33,6 @@ lose=-1.0
 draw=0
 
 # win, lose, win_separated, win_length_factor
-reward_cons1 = [10, -10, 10, 150]
-reward_cons2 = [10, -20, 20, 150]
-reward_cons3 = [20, -10, 10, 200]
+reward_cons1 = [10, -20, 18, 150]
+reward_cons2 = [10, -20, 15, 100]
+reward_cons3 = [10, -20, 20, 150]

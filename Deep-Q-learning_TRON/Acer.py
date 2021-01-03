@@ -2,7 +2,7 @@
 import argparse
 import os
 import csv
-# import platform
+import platform
 import gym
 import torch
 from torch import multiprocessing as mp
@@ -12,6 +12,9 @@ from Net.sharedRMS import SharedRMSprop
 from train import train
 from test import test
 from utils import Counter
+
+from tron.util import *
+from Net.ACNet import *
 
 
 parser = argparse.ArgumentParser(description='ACER')
@@ -66,27 +69,37 @@ if __name__ == '__main__':
       print(' ' * 26 + k + ': ' + str(v))
       f.write(k + ' : ' + str(v) + '\n')
   # args.env = 'CartPole-v1'  # TODO: Remove hardcoded environment when code is more adaptable
-  # mp.set_start_method(platform.python_version()[0] == '3' and 'spawn' or 'fork')  # Force true spawning (not forking) if available
+  mp.set_start_method(platform.python_version()[0] == '3' and 'spawn')  # Force true spawning (not forking) if available
   torch.manual_seed(args.seed)
   T = Counter()  # Global shared counter
   gym.logger.set_level(gym.logger.ERROR)  # Disable Gym warnings
 
   # Create shared network
   env = gym.make(args.env)
+  env_tron = make_game(True, True)
   shared_model = ActorCritic(env.observation_space, env.action_space, args.hidden_size) # 입력 state, 액션, 히든 사이
+  shared_model_tron = Net4()
   shared_model.share_memory()
+  shared_model_tron.share_memory()
   if args.model and os.path.isfile(args.model):
     # Load pretrained weights
     shared_model.load_state_dict(torch.load(args.model))
   # Create average network
   shared_average_model = ActorCritic(env.observation_space, env.action_space, args.hidden_size)
+  shared_average_model_tron = Net4()
   shared_average_model.load_state_dict(shared_model.state_dict())
+  shared_average_model_tron.load_state_dict(shared_model_tron.state_dict())
   shared_average_model.share_memory()
+  shared_average_model_tron.share_memory()
   for param in shared_average_model.parameters():
+    param.requires_grad = False
+  for param in shared_average_model_tron.parameters():
     param.requires_grad = False
   # Create optimiser for shared network parameters with shared statistics
   optimiser = SharedRMSprop(shared_model.parameters(), lr=args.lr, alpha=args.rmsprop_decay)
+  optimiser_tron = SharedRMSprop(shared_model.parameters(), lr=args.lr, alpha=args.rmsprop_decay)
   optimiser.share_memory()
+  optimiser_tron.share_memory()
   env.close()
 
   fields = ['t', 'rewards', 'avg_steps', 'time']
@@ -95,18 +108,23 @@ if __name__ == '__main__':
     writer.writerow(fields)
   # Start validation agent
   processes = []
+  processes_tron = []
   p = mp.Process(target=test, args=(0, args, T, shared_model))
+  p_tron = mp.Process(target=test, args=(0, args, T, shared_model_tron))
   p.start()
+  p_tron.start()
   processes.append(p)
+  processes_tron.append(p_tron)
 
   if not args.evaluate:
     # Start training agents
     for rank in range(1, args.num_processes + 1):
       p = mp.Process(target=train, args=(rank, args, T, shared_model, shared_average_model, optimiser))
-      p.start()
+      p_tron = mp.Process(target=train, args=(rank, args, T, shared_model_tron, shared_average_model_tron, optimiser_tron))
+      p_tron.start()
       print('Process ' + str(rank) + ' started')
-      processes.append(p)
+      processes_tron.append(p_tron)
 
   # Clean up
-  for p in processes:
-    p.join()
+  for p_tron in processes_tron:
+    p_tron.join()
