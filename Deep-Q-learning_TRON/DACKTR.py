@@ -1,4 +1,4 @@
-from Net.ACNet import *
+from Net.DACNet import *
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
@@ -30,7 +30,7 @@ class RolloutStorage(object):
         self.actions = torch.zeros(num_steps, num_processes, 1).long()
 
         # 할인 총보상 저장
-        self.returns = torch.zeros(num_steps + 1, num_processes, 1)
+        self.returns = torch.zeros(num_steps + 1, num_processes, NUM_ATOM)
         self.index = 0  # insert할 인덱스
 
     def insert(self, current_obs, action, reward, mask):
@@ -47,16 +47,25 @@ class RolloutStorage(object):
         self.observations[0].copy_(self.observations[-1])
         self.masks[0].copy_(self.masks[-1])
 
-    def compute_returns(self, next_value):
+    def compute_returns(self, next_value, next_act):
         '''Advantage학습 범위 안의 각 단계에 대해 할인 총보상을 계산'''
 
         # 주의 : 5번째 단계부터 거슬러 올라오며 계산
         # 주의 : 5번째 단계가 Advantage1, 4번째 단계는 Advantage2가 됨
 
-        self.returns[-1] = next_value
+        # self.returns[-1] = next_value  # 분포로 계산해야함!!
+        next_act = next_act.argmax(dim=1)
+        next_value = next_value.view(NUM_PROCESSES, NUM_ATOM, 4)
+
+        next_max = next_value[0, :, next_act[0]].unsqueeze(0)
+
+        for i in range(1, NUM_PROCESSES):
+            next_max = torch.cat((next_max, next_value[i, :, next_act[i]].unsqueeze(0)), dim=0)
+
+        self.returns[-1] = next_max
 
         for ad_step in reversed(range(self.rewards.size(0))):
-            self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]
+            self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]  # Q value, reward를 분포로 바꾸고 평균값의 max를 구해야 함
 
 # 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
 class Brain(object):
@@ -79,8 +88,10 @@ class Brain(object):
         '''Advantage학습의 대상이 되는 5단계 모두를 사용하여 수정'''
         num_steps = NUM_ADVANCED_STEP
         num_processes = NUM_PROCESSES
+        num_atom = NUM_ATOM
+        tau = torch.Tensor((2 * np.arange(16) + 1) / (2.0 * 16)).view(1, -1).to(device)
 
-        values, action_log_probs, entropy = self.actor_critic.evaluate_actions(
+        values, action_log_probs, entropy, actor_output = self.actor_critic.evaluate_actions(
             rollouts.observations[:-1].view(-1, 3, 12, 12).to(device).detach(),
             rollouts.actions.view(-1, 1).to(device).detach())
 
@@ -92,15 +103,29 @@ class Brain(object):
         # action_log_probs torch.Size([80, 1])
         # entropy torch.Size([])
 
-        values = values.view(num_steps, num_processes,1)  # torch.Size([160, 1]) ->([5, 32, 1])
+        acts = actor_output.view(-1, 4).argmax(dim=1)
+        values = values.view(-1, num_atom, 4)
 
-        action_log_probs = action_log_probs.view(num_steps, num_processes, 1) # torch.Size([160, 1]) ->([5, 32, 1])
+        value_max = values[0, :, acts[0]].unsqueeze(0)
+
+        for i in range(1, NUM_ADVANCED_STEP * NUM_PROCESSES):
+            value_max = torch.cat((value_max, values[i, :, acts[i]].unsqueeze(0)), dim=0)
+
+        value_max = value_max.view(num_steps, num_processes, num_atom)
+
+        action_log_probs = action_log_probs.view(num_steps, num_processes, 1) # torch.Size([80, 1]) ->([5, 16, 1])
 
         # advantage(행동가치-상태가치) 계산
-        advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 1])
+        # advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 8])
+
+        advantages = rollouts.returns[:-1].to(device).transpose(1, 2).transpose(0, 1).unsqueeze(-1) - value_max
+
+        huber = torch.where(advantages.abs() < 1.0, 0.5 * advantages.pow(2), 1.0 * (advantages.abs() - 0.5 * 1.0)).to(device)
 
         # Critic의 loss 계산
-        value_loss = advantages.mean()
+        # value_loss = advantages.pow(2).mean()
+        value_loss = huber * (tau - (advantages.detach() < 0).float()).abs()
+        value_loss = value_loss.pow(2).mean()
 
         # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
 
@@ -114,12 +139,12 @@ class Brain(object):
             self.actor_critic.zero_grad()
             pg_fisher_loss = -action_log_probs.mean()
 
-            value_noise = torch.randn(values.size())
-            if values.is_cuda:
+            value_noise = torch.randn(value_max.size())
+            if value_max.is_cuda:
                 value_noise = value_noise.cuda()
 
-            sample_values = values + value_noise
-            vf_fisher_loss = -(values - sample_values.detach()).pow(2).mean()
+            sample_values = value_max + value_noise
+            vf_fisher_loss = -(value_max - sample_values.detach()).pow(2).mean()
 
             fisher_loss = pg_fisher_loss + vf_fisher_loss
             self.optimizer.acc_stats = True
@@ -167,7 +192,7 @@ def train(args):
 
     envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
 
-    eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
+    eventid = datetime.now().strftime('runs/DACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
         NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + unique + '-model ' + m + '-reward ' + r
 
     writer = SummaryWriter(eventid)
@@ -178,9 +203,9 @@ def train(args):
     elif args.m == "3":
         actor_critic = Net3()
     else:
-        actor_critic = Net()
+        actor_critic = Net3()
 
-    global_brain = Brain(actor_critic,args, acktr=False)
+    global_brain = Brain(actor_critic,args, acktr=True)
 
     rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
@@ -225,8 +250,6 @@ def train(args):
         reward_constants = reward_cons3
     else:
         reward_constants = reward_cons1
-
-
 
     # 1 에피소드에 해당하는 반복문
     while True:  # 전체 for문
@@ -306,13 +329,13 @@ def train(args):
         # advanced 학습 대상 중 마지막 단계의 상태로 예측하는 상태가치를 계산
 
         with torch.no_grad():
-            next_value1 = actor_critic.get_value(rollouts1.observations[-1])
-            next_value2 = actor_critic.get_value(rollouts2.observations[-1])
+            next_value1, next_act1 = actor_critic.get_value(rollouts1.observations[-1])
+            next_value2, next_act2 = actor_critic.get_value(rollouts2.observations[-1])
             # rollouts.observations의 크기는 torch.Size([6, 32, 4])
 
         # 모든 단계의 할인총보상을 계산하고, rollouts의 변수 returns를 업데이트
-        rollouts1.compute_returns(next_value1)
-        rollouts2.compute_returns(next_value2)
+        rollouts1.compute_returns(next_value1, next_act1)
+        rollouts2.compute_returns(next_value2, next_act2)
 
         # 신경망 및 rollout 업데이트
         loss1, val1, act1, entro1, prob1, advan1 = global_brain.update(rollouts1)
@@ -348,7 +371,7 @@ def train(args):
             if total_loss_sum1 < min_loss:
                 min_loss = act_loss_sum1
 
-            torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'ACKTR_player'+m + unique +'.bak')
+            torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'DACKTR_player' + m + unique +'.bak')
             # torch.save(global_brain2.actor_critic.state_dict(), 'ais/a3c/' + 'player_2.bak')
 
             writer.add_scalar('Training loss', total_loss_sum1, losscount)

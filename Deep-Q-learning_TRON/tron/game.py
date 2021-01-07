@@ -187,6 +187,7 @@ class Game:
             else:
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
 
+        """
         if not done and self.check_separated(map_clone, self.pps[0]):
             winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             if winner == 1:
@@ -196,6 +197,7 @@ class Game:
             else:
                 self.pps[0].alive = False
                 self.pps[1].alive = False
+        """
 
         self.history.append(HistoryElement(map_clone, None, None))
         self.next_p1 = self.history[-1].map.state_for_player(1)
