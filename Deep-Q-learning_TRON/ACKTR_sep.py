@@ -134,20 +134,18 @@ class Brain(object):
 
 def train(args):
     '''실행 엔트리 포인트'''
-    max_val = 0
-    min_loss = 0
-    total_loss_sum1 = 0
-    val_loss_sum1 = 0
-    entropy_sum1 = 0
-    act_loss_sum1 = 0
-    prob1_loss_sum1 = 0
-    advan_loss_sum1 = 0
+    num_agents = 2
 
-    p1_win = 0
-    game_draw = 0
+    total_loss_sum = [0 for _ in range(num_agents)]
+    val_loss_sum = [0 for _ in range(num_agents)]
+    entropy_sum = [0 for _ in range(num_agents)]
+    act_loss_sum = [0 for _ in range(num_agents)]
+    prob_loss_sum = [0 for _ in range(num_agents)]
+    adv_loss_sum = [0 for _ in range(num_agents)]
 
     ai_p1=True
     ai_p2=True
+
     p= "1" if args.p is None else args.p
     v = "1" if args.v is None else args.v
     m = "1" if args.m is None else args.m
@@ -156,63 +154,41 @@ def train(args):
 
     envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
 
-    eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
-        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + unique + '-model ' + m + '-reward ' + r
+    eventid = [datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-') + 'p' + str(i) + '-ent ' + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
+        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + unique + '-model ' + m + '-reward ' + r for i in range(num_agents)]
 
-    writer = SummaryWriter(eventid)
+    writer = [SummaryWriter(eventid[i]) for i in range(num_agents)]
 
-    if args.m == "2":
-        actor_critic = Net2()  # 신경망 객체 생성
-    elif args.m == "3":
-        actor_critic = Net3()
-    else:
-        actor_critic = Net()
+    actor_critic = [Net() for _ in range(num_agents)]
+    local_brain = [Brain(actor_critic[i], args, acktr=True) for i in range(num_agents)]
 
-    global_brain = Brain(actor_critic,args, acktr=False)
-
-    rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
-    episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
-    obs_np1 = np.zeros([NUM_PROCESSES,12,12])  # Numpy 배열 # 게임 상황이 12x12임
-    reward_np1 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
-    each_step1 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
-
-    rollouts2 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
-    episode_rewards2 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
-    obs_np2 = np.zeros([NUM_PROCESSES,12, 12])  # Numpy 배열 # 게임 상황이 12x12임
-    reward_np2 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
-    each_step2 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
+    rollouts = [RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES) for _ in range(num_agents)]  # rollouts 객체
+    episode_rewards = [torch.zeros([NUM_PROCESSES, 1]) for _ in range(num_agents)]  # 현재 에피소드의 보상
+    obs_np = [np.zeros([NUM_PROCESSES,12,12]) for _ in range(num_agents)]  # Numpy 배열 # 게임 상황이 12x12임
+    reward_np = [np.zeros([NUM_PROCESSES, 1]) for _ in range(num_agents)]  # Numpy 배열
+    each_step = [np.zeros(NUM_PROCESSES) for _ in range(num_agents)]  # 각 환경의 단계 수를 기록
 
     done_np = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
 
     # 초기 상태로부터 시작
 
-    obs1 = [pop_up(envs[i].map().state_for_player(1)) for i in range(NUM_PROCESSES)]
+    obs = [[pop_up(envs[i].map().state_for_player(1)) for i in range(NUM_PROCESSES)] for _ in range(num_agents)]
     # obs1 = [envs[i].map().state_for_player(1) for i in range(NUM_PROCESSES)]
-    obs1 = np.array(obs1)
-    obs1 = torch.from_numpy(obs1).float()  # torch.Size([32, 4])
+    obs = np.array(obs)
+    obs = torch.from_numpy(obs).float()  # torch.Size([32, 4])
 
-    current_obs1 = obs1  # 가장 최근의 obs를 저장
-
-    obs2 = [pop_up(envs[i].map().state_for_player(2)) for i in range(NUM_PROCESSES)]
-    # obs2 = [envs[i].map().state_for_player(2) for i in range(NUM_PROCESSES)]
-    obs2 = np.array(obs2)
-    obs2 = torch.from_numpy(obs2).float()  # torch.Size([32, 4])
-
-    current_obs2 = obs2  # 가장 최근의 obs를 저장
+    current_obs = obs  # 가장 최근의 obs를 저장
 
     # advanced 학습에 사용되는 객체 rollouts 첫번째 상태에 현재 상태를 저장
-    rollouts1.observations[0].copy_(current_obs1)
-    rollouts2.observations[0].copy_(current_obs2)
+
+    for i in range(num_agents):
+        rollouts[i].observations[0].copy_(current_obs[i])
+
     gamecount = 0
     losscount = 0
     duration = 0
 
-    if args.r == "2":
-        reward_constants = reward_cons2
-    elif args.r == "3":
-        reward_constants = reward_cons3
-    else:
-        reward_constants = reward_cons1
+    reward_constants = reward_cons1
 
     minimax = MinimaxPlayer(2, 'voronoi')
 
@@ -222,139 +198,127 @@ def train(args):
         for step in range(NUM_ADVANCED_STEP):
             # 행동을 선택
             with torch.no_grad():
-                action1 = actor_critic.act(rollouts1.observations[step])
-                action2 = actor_critic.act(rollouts2.observations[step])
+                action = [actor_critic[i].act(rollouts[i].observations[step]) for i in range(num_agents)]
 
-            # (32,1)→(32,) -> tensor를 NumPy변수로
-            actions1 = action1.squeeze(1).to('cpu').numpy()
-            actions2 = action2.squeeze(1).to('cpu').numpy()
+            actions = [action[j].squeeze(1).to('cpu').numpy() for j in range(num_agents)]
 
             # 한 단계를 실행
             for i in range(NUM_PROCESSES):
-                act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
-                act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
+                acts = [actions[j][i] if ai_p1 else minimax.action(envs[i].map(), 1) for j in range(num_agents)]
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len = envs[i].step(act1,act2)
+                obs_np[0][i], reward_np[0][i], obs_np[1][i], reward_np[1][i], done_np[i],loser_len,winner_len = envs[i].step(acts[0],acts[1])
 
-                each_step1[i] += 1
-                each_step2[i] += 1
+                for j in range(num_agents):
+                    each_step[j][i] += 1
 
                 if done_np[i]:
-                    reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
+                    reward_np[0][i],reward_np[1][i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
                     if i == 0:
                         gamecount += 1
-                        duration += each_step1[i]+loser_len
+                        duration += each_step[0][i]+loser_len
 
                         if gamecount % SHOW_ITER == 0:
-                            print('%d Episode: Finished after %d steps' % (gamecount, each_step1[i]))
-                            writer.add_scalar('Duration', duration/SHOW_ITER, gamecount)
+                            print('%d Episode: Finished after %d steps' % (gamecount, each_step[0][i]))
+                            for j in range(num_agents):
+                                writer[j].add_scalar('Duration', duration/SHOW_ITER, gamecount)
                             duration = 0
 
                     envs[i] = make_game(ai_p1,ai_p2)
 
-                    obs_np1[i] = envs[i].map().state_for_player(1)
-                    obs_np2[i] = envs[i].map().state_for_player(2)
-                    each_step1[i] = 0
-                    each_step2[i] = 0
+                    for j in range(num_agents):
+                        obs_np[j][i] = envs[i].map().state_for_player(j)
+
+                    for j in range(num_agents):
+                        each_step[j][i] = 0
                 else:
-                    reward_np1[i] = -1  # 그 외의 경우는 보상 0 부여
-                    reward_np2[i] = -1
+                    for j in range(num_agents):
+                        reward_np[j][i] = -1  # 그 외의 경우는 보상 0 부여
 
             # 보상을 tensor로 변환하고, 에피소드의 총보상에 더해줌
-            reward1 = torch.from_numpy(reward_np1).float()
-            episode_rewards1 += reward1
-
-            reward2 = torch.from_numpy(reward_np2).float()
-            episode_rewards2 += reward2
+            rewards = [torch.from_numpy(reward_np[j]).float() for j in range(num_agents)]
+            episode_rewards += [rewards[j] for j in range(num_agents)]
 
             # 각 실행 환경을 확인하여 done이 true이면 mask를 0으로, false이면 mask를 1로
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done_np])
 
             # current_obs를 업데이트
-            obs1 = [pop_up(obs_np1[i]) for i in range(NUM_PROCESSES)]
-            obs2 = [pop_up(obs_np2[i]) for i in range(NUM_PROCESSES)]
+            obs = [[pop_up(obs_np[j][i]) for i in range(NUM_PROCESSES)] for j in range(num_agents)]
 
-            obs1 = torch.tensor(np.array(obs1))
-            obs2 = torch.tensor(np.array(obs2))
+            obs = [torch.tensor(np.array(obs[j])) for j in range(num_agents)]
 
-            current_obs1 = obs1  # 최신 상태의 obs를 저장
-            current_obs2 = obs2  # 최신 상태의 obs를 저장
+            current_obs = [obs[j] for j in range(num_agents)]  # 최신 상태의 obs를 저장
 
             # 메모리 객체에 현 단계의 transition을 저장
-            rollouts1.insert(current_obs1, action1.data, reward1, masks)
-            rollouts2.insert(current_obs2, action2.data, reward2, masks)
+            for j in range(num_agents):
+                rollouts[j].insert(current_obs[j], action[j].data, rewards[j], masks)
 
         # advanced 학습 for문 끝
-
         # advanced 학습 대상 중 마지막 단계의 상태로 예측하는 상태가치를 계산
 
         with torch.no_grad():
-            next_value1 = actor_critic.get_value(rollouts1.observations[-1])
-            next_value2 = actor_critic.get_value(rollouts2.observations[-1])
+            next_value = [actor_critic[j].get_value(rollouts[j].observations[-1]) for j in range(num_agents)]
             # rollouts.observations의 크기는 torch.Size([6, 32, 4])
 
         # 모든 단계의 할인총보상을 계산하고, rollouts의 변수 returns를 업데이트
-        rollouts1.compute_returns(next_value1)
-        rollouts2.compute_returns(next_value2)
+        for j in range(num_agents):
+            rollouts[j].compute_returns(next_value[j])
 
-        # 신경망 및 rollout 업데이트
-        loss1, val1, act1, entro1, prob1, advan1 = global_brain.update(rollouts1)
-        global_brain.update(rollouts2)
+            # 신경망 및 rollout 업데이트
+            loss, val, act, entro, prob, advan = local_brain[j].update(rollouts[j])
+
+            act_loss_sum[j] += act
+            entropy_sum[j] += entro
+            val_loss_sum[j] += val
+            total_loss_sum[j] += loss
+            prob_loss_sum[j] += prob
+            adv_loss_sum[j] += advan
+
         losscount += 1
 
-        act_loss_sum1 += act1
-        entropy_sum1 += entro1
-        val_loss_sum1 += val1
-        total_loss_sum1 += loss1
-        prob1_loss_sum1 += prob1
-        advan_loss_sum1 += advan1
-
         if losscount%SHOW_ITER == 0:
-            total_loss_sum1 = total_loss_sum1 / SHOW_ITER
-            val_loss_sum1 = val_loss_sum1 / SHOW_ITER
-            act_loss_sum1 = act_loss_sum1 / SHOW_ITER
-            entropy_sum1 = entropy_sum1 / SHOW_ITER
-            prob1_loss_sum1 /= SHOW_ITER
-            advan_loss_sum1 /= SHOW_ITER
+            for j in range(num_agents):
+                total_loss_sum[j] /= SHOW_ITER
+                val_loss_sum[j] /= SHOW_ITER
+                act_loss_sum[j] /= SHOW_ITER
+                entropy_sum[j] /= SHOW_ITER
+                prob_loss_sum[j] /= SHOW_ITER
+                adv_loss_sum[j] /= SHOW_ITER
 
-            if val_loss_sum1 > max_val:
-                max_val = val_loss_sum1
-            if total_loss_sum1 < min_loss:
-                min_loss = act_loss_sum1
 
-            torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'ACKTR_player'+m + unique +'.bak')
-            # torch.save(global_brain2.actor_critic.state_dict(), 'ais/a3c/' + 'player_2.bak')
+                torch.save(local_brain[j].actor_critic.state_dict(), 'save/' + 'ACKTR_sep_player' + str(j) + m + unique + '.bak')
 
-            writer.add_scalar('Training loss', total_loss_sum1, losscount)
-            writer.add_scalar('Value loss', val_loss_sum1, losscount)
-            writer.add_scalar('Action gain', act_loss_sum1, losscount)
-            writer.add_scalar('Entropy loss', entropy_sum1, losscount)
-            writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
-            writer.add_scalar('Advantage', advan_loss_sum1, losscount)
+                writer[j].add_scalar('Training loss', total_loss_sum[j], losscount)
+                writer[j].add_scalar('Value loss', val_loss_sum[j], losscount)
+                writer[j].add_scalar('Action gain', act_loss_sum[j], losscount)
+                writer[j].add_scalar('Entropy loss', entropy_sum[j], losscount)
+                writer[j].add_scalar('Action log probability', prob_loss_sum[j], losscount)
+                writer[j].add_scalar('Advantage', adv_loss_sum[j], losscount)
 
-            if losscount%200 == 0:
-                for i in range(PLAY_WITH_MINIMAX):
-                    game = make_game(True, False, 'fair')
-                    game.main_loop(global_brain.actor_critic, pop_up)
+            if losscount % 200 == 0:
+                p1_win = 0
+                game_draw = 0
 
-                    if game.winner == 1:
-                        p1_win += 1
-                    elif game.winner is None:
-                        game_draw += 1
+                for j in range(num_agents):
+                    for i in range(PLAY_WITH_MINIMAX):
+                        game = make_game(True, False, 'fair')
+                        game.main_loop(local_brain[j].actor_critic, pop_up)
 
-                writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
+                        if game.winner == 1:
+                            p1_win += 1
+                        elif game.winner is None:
+                            game_draw += 1
 
-            p1_win = 0
-            game_draw = 0
-            act_loss_sum1 = 0
-            entropy_sum1 = 0
-            val_loss_sum1 = 0
-            total_loss_sum1 = 0
-            prob1_loss_sum1 = 0
-            advan_loss_sum1 = 0
+                        writer[j].add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
 
-        rollouts1.after_update()
-        rollouts2.after_update()
+            act_loss_sum = [0 for _ in range(num_agents)]
+            entropy_sum = [0 for _ in range(num_agents)]
+            val_loss_sum= [0 for _ in range(num_agents)]
+            total_loss_sum = [0 for _ in range(num_agents)]
+            prob_loss_sum = [0 for _ in range(num_agents)]
+            adv_loss_sum = [0 for _ in range(num_agents)]
+
+        for j in range(num_agents):
+            rollouts[j].after_update()
 
 
 def main():

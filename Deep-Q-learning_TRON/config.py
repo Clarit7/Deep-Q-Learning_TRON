@@ -11,9 +11,9 @@ lr = 1e-3
 eps = 1e-5
 alpha = 0.99
 
-NUM_PROCESSES = 16  # 동시 실행 환경 수
+NUM_PROCESSES = 8  # 동시 실행 환경 수
 NUM_ADVANCED_STEP = 5 # 총 보상을 계산할 때 Advantage 학습을 할 단계 수
-NUM_ATOM = 16
+NUM_ATOM = 32
 
 # A2C 손실함수 계산에 사용되는 상수
 value_loss_coef = 0.5
@@ -34,6 +34,5 @@ lose=-1.0
 draw=0
 
 # win, lose, win_separated, win_length_factor
-reward_cons1 = [10, -20, 18, 150]
-reward_cons2 = [10, -25, 15, 100]
-reward_cons3 = [10, -20, 20, 150]
+reward_cons1 = [10, -20, 20, 150]
+

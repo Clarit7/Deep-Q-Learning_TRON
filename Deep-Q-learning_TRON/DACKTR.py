@@ -54,15 +54,18 @@ class RolloutStorage(object):
         # 주의 : 5번째 단계가 Advantage1, 4번째 단계는 Advantage2가 됨
 
         # self.returns[-1] = next_value  # 분포로 계산해야함!!
-        next_act = next_act.argmax(dim=1)
-        next_value = next_value.view(NUM_PROCESSES, NUM_ATOM, 4)
+        # next_act = next_act.argmax(dim=1)
 
+        next_value = next_value.view(NUM_PROCESSES, NUM_ATOM)
+
+        """
         next_max = next_value[0, :, next_act[0]].unsqueeze(0)
 
         for i in range(1, NUM_PROCESSES):
             next_max = torch.cat((next_max, next_value[i, :, next_act[i]].unsqueeze(0)), dim=0)
+        """
 
-        self.returns[-1] = next_max
+        self.returns[-1] = next_value.detach()
 
         for ad_step in reversed(range(self.rewards.size(0))):
             self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]  # Q value, reward를 분포로 바꾸고 평균값의 max를 구해야 함
@@ -81,15 +84,17 @@ class Brain(object):
         if acktr:
             self.optimizer = KFACOptimizer(self.actor_critic)
         else:
-            self.optimizer = optim.RMSprop(
-                self.actor_critic.parameters(), lr, eps=eps, alpha=alpha)
+            self.optimizer = optim.SGD(self.actor_critic.parameters(), lr=lr, momentum=0.9
+                                       )
+            # self.optimizer = optim.RMSprop(elf.actor_critic.parameters(), lr, eps=eps, alpha=alpha)
+            # self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=lr, eps=eps)
 
     def update(self, rollouts):
         '''Advantage학습의 대상이 되는 5단계 모두를 사용하여 수정'''
         num_steps = NUM_ADVANCED_STEP
         num_processes = NUM_PROCESSES
         num_atom = NUM_ATOM
-        tau = torch.Tensor((2 * np.arange(16) + 1) / (2.0 * 16)).view(1, -1).to(device)
+        tau = torch.Tensor((2 * np.arange(NUM_ATOM) + 1) / (2.0 * NUM_ATOM)).view(1, -1).to(device)
 
         values, action_log_probs, entropy, actor_output = self.actor_critic.evaluate_actions(
             rollouts.observations[:-1].view(-1, 3, 12, 12).to(device).detach(),
@@ -103,29 +108,31 @@ class Brain(object):
         # action_log_probs torch.Size([80, 1])
         # entropy torch.Size([])
 
+        """
         acts = actor_output.view(-1, 4).argmax(dim=1)
         values = values.view(-1, num_atom, 4)
-
+        
         value_max = values[0, :, acts[0]].unsqueeze(0)
 
         for i in range(1, NUM_ADVANCED_STEP * NUM_PROCESSES):
             value_max = torch.cat((value_max, values[i, :, acts[i]].unsqueeze(0)), dim=0)
+        """
 
-        value_max = value_max.view(num_steps, num_processes, num_atom)
+        values = values.view(num_steps, num_processes, num_atom)
 
         action_log_probs = action_log_probs.view(num_steps, num_processes, 1) # torch.Size([80, 1]) ->([5, 16, 1])
 
         # advantage(행동가치-상태가치) 계산
         # advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 8])
 
-        advantages = rollouts.returns[:-1].to(device).transpose(1, 2).transpose(0, 1).unsqueeze(-1) - value_max
+        advantages = rollouts.returns[:-1].to(device).transpose(1, 2).transpose(0, 1).unsqueeze(-1) - values
 
         huber = torch.where(advantages.abs() < 1.0, 0.5 * advantages.pow(2), 1.0 * (advantages.abs() - 0.5 * 1.0)).to(device)
 
         # Critic의 loss 계산
         # value_loss = advantages.pow(2).mean()
         value_loss = huber * (tau - (advantages.detach() < 0).float()).abs()
-        value_loss = value_loss.pow(2).mean()
+        value_loss = value_loss.mean()
 
         # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
 
@@ -139,12 +146,12 @@ class Brain(object):
             self.actor_critic.zero_grad()
             pg_fisher_loss = -action_log_probs.mean()
 
-            value_noise = torch.randn(value_max.size())
-            if value_max.is_cuda:
+            value_noise = torch.randn(values.size())
+            if values.is_cuda:
                 value_noise = value_noise.cuda()
 
-            sample_values = value_max + value_noise
-            vf_fisher_loss = -(value_max - sample_values.detach()).pow(2).mean()
+            sample_values = values + value_noise
+            vf_fisher_loss = -(values - sample_values.detach()).pow(2).mean()
 
             fisher_loss = pg_fisher_loss + vf_fisher_loss
             self.optimizer.acc_stats = True
@@ -244,12 +251,7 @@ def train(args):
     losscount = 0
     duration = 0
 
-    if args.r == "2":
-        reward_constants = reward_cons2
-    elif args.r == "3":
-        reward_constants = reward_cons3
-    else:
-        reward_constants = reward_cons1
+    reward_constants = reward_cons1
 
     # 1 에피소드에 해당하는 반복문
     while True:  # 전체 for문

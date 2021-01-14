@@ -80,12 +80,6 @@ def get_reward(game, constants, winner_len=0, loser_len=0):
     if game.winner is None:
         return 0, 0
     elif game.winner == 1:
-        return constants[0], constants[1]
-    else:
-        return constants[1], constants[0]
-
-    """
-    elif game.winner == 1:
         if loser_len == 0 and winner_len == 0:
             return constants[0], constants[1]
         else:
@@ -95,4 +89,3 @@ def get_reward(game, constants, winner_len=0, loser_len=0):
             return constants[1], constants[0]
         else:
             return constants[1], constants[2] + constants[3]/loser_len
-    """
