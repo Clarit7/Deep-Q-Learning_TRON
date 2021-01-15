@@ -89,7 +89,7 @@ class Brain(object):
         advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 1])
 
         # Critic의 loss 계산
-        value_loss = advantages.mean()
+        value_loss = advantages.pow(2).mean()
 
         # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
 
@@ -159,7 +159,7 @@ def train(args):
 
     writer = [SummaryWriter(eventid[i]) for i in range(num_agents)]
 
-    actor_critic = [Net() for _ in range(num_agents)]
+    actor_critic = [Net3() for _ in range(num_agents)]
     local_brain = [Brain(actor_critic[i], args, acktr=True) for i in range(num_agents)]
 
     rollouts = [RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES) for _ in range(num_agents)]  # rollouts 객체
@@ -172,8 +172,7 @@ def train(args):
 
     # 초기 상태로부터 시작
 
-    obs = [[pop_up(envs[i].map().state_for_player(1)) for i in range(NUM_PROCESSES)] for _ in range(num_agents)]
-    # obs1 = [envs[i].map().state_for_player(1) for i in range(NUM_PROCESSES)]
+    obs = [[pop_up(envs[i].map().state_for_player(j+1)) for i in range(NUM_PROCESSES)] for j in range(num_agents)]
     obs = np.array(obs)
     obs = torch.from_numpy(obs).float()  # torch.Size([32, 4])
 
@@ -226,7 +225,7 @@ def train(args):
                     envs[i] = make_game(ai_p1,ai_p2)
 
                     for j in range(num_agents):
-                        obs_np[j][i] = envs[i].map().state_for_player(j)
+                        obs_np[j][i] = envs[i].map().state_for_player(j+1)
 
                     for j in range(num_agents):
                         each_step[j][i] = 0

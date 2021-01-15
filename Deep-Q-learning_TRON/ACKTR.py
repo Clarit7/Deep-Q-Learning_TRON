@@ -10,11 +10,20 @@ from config import *
 
 import argparse
 
+minimax = MinimaxPlayer(2, 'voronoi')
+folderName='save'
+
+
+# DQN = DQNNET()
+# DQN.load_state_dict(torch.load(folderName+'/DDQN.bak'))
+# DQN.eval()
+
 
 class RolloutStorage(object):
     '''Advantage 학습에 사용할 메모리 클래스'''
     def __init__(self, num_steps, num_processes):
 
+        # self.observations = torch.zeros(num_steps + 1, num_processes,3,12,12)
         self.observations = torch.zeros(num_steps + 1, num_processes, 3, 12, 12)
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
         self.rewards = torch.zeros(num_steps, num_processes, 1)
@@ -53,6 +62,8 @@ class RolloutStorage(object):
 class Brain(object):
     def __init__(self, actor_critic,args, acktr=False):
         self.actor_critic = actor_critic.to(device)  # actor_critic은 Net 클래스로 구현한 신경망
+        #self.optimizer = optim.RMSprop(self.actor_critic.parameters(), lr=lr, eps=eps, alpha=alpha)
+
         self.acktr = acktr
 
         self.policy_loss_coef = policy_loss_coef if args.p is None else float(args.p)
@@ -89,13 +100,12 @@ class Brain(object):
         advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 1])
 
         # Critic의 loss 계산
-        value_loss = advantages.mean()
+        value_loss = advantages.pow(2).mean()
 
         # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
 
         radvantages = advantages.detach().mean()
         action_gain = (action_log_probs * advantages.detach()).mean()
-
         # detach 메서드를 호출하여 advantages를 상수로 취급
 
         if self.acktr and self.optimizer.steps % self.optimizer.Ts == 0:
@@ -118,7 +128,8 @@ class Brain(object):
         self.optimizer.zero_grad()
 
         # 오차함수의 총합
-        total_loss = (value_loss * value_loss_coef - action_gain * policy_loss_coef - entropy * entropy_coef)
+        total_loss = (value_loss * value_loss_coef -
+                      action_gain * policy_loss_coef - entropy * entropy_coef)
 
         # 결합 가중치 수정
         total_loss.backward()  # 역전파 계산
@@ -161,6 +172,7 @@ def train(args):
 
     writer = SummaryWriter(eventid)
 
+
     if args.m == "2":
         actor_critic = Net2()  # 신경망 객체 생성
     elif args.m == "3":
@@ -168,7 +180,7 @@ def train(args):
     else:
         actor_critic = Net()
 
-    global_brain = Brain(actor_critic,args, acktr=False)
+    global_brain = Brain(actor_critic,args, acktr=True)
 
     rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
@@ -214,7 +226,7 @@ def train(args):
     else:
         reward_constants = reward_cons1
 
-    minimax = MinimaxPlayer(2, 'voronoi')
+
 
     # 1 에피소드에 해당하는 반복문
     while True:  # 전체 for문
@@ -273,6 +285,11 @@ def train(args):
             # current_obs를 업데이트
             obs1 = [pop_up(obs_np1[i]) for i in range(NUM_PROCESSES)]
             obs2 = [pop_up(obs_np2[i]) for i in range(NUM_PROCESSES)]
+            # obs1 = [obs_np1[i] for i in range(NUM_PROCESSES)]
+            # obs2 = [obs_np2[i] for i in range(NUM_PROCESSES)]
+
+            # obs1 = torch.from_numpy(pop_up(obs_np1)).float()
+            # obs2 = torch.from_numpy(pop_up(obs_np2)).float()
 
             obs1 = torch.tensor(np.array(obs1))
             obs2 = torch.tensor(np.array(obs2))
@@ -308,6 +325,15 @@ def train(args):
         total_loss_sum1 += loss1
         prob1_loss_sum1 += prob1
         advan_loss_sum1 += advan1
+
+        # if(gamecount>2000):
+        #     pygame.init()
+        #     game = make_game(True, True)
+        #     pygame.mouse.set_visible(False)
+        #
+        #     window = Window(game, 40)
+        #
+        #     game.main_loop(global_brain.actor_critic, pop_up, window)
 
         if losscount%SHOW_ITER == 0:
             total_loss_sum1 = total_loss_sum1 / SHOW_ITER
