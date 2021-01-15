@@ -294,10 +294,10 @@ def train(args):
                 writer[j].add_scalar('Advantage', adv_loss_sum[j], losscount)
 
             if losscount % 200 == 0:
-                p1_win = 0
-                game_draw = 0
-
                 for j in range(num_agents):
+                    p1_win = 0
+                    game_draw = 0
+
                     for i in range(PLAY_WITH_MINIMAX):
                         game = make_game(True, False, 'fair')
                         game.main_loop(local_brain[j].actor_critic, pop_up)
