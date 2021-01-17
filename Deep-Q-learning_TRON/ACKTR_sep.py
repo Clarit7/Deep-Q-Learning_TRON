@@ -293,21 +293,23 @@ def train(args):
                 writer[j].add_scalar('Action log probability', prob_loss_sum[j], losscount)
                 writer[j].add_scalar('Advantage', adv_loss_sum[j], losscount)
 
-            if losscount % 200 == 0:
-                for j in range(num_agents):
-                    p1_win = 0
-                    game_draw = 0
+            with torch.no_grad():
+                if losscount % 200 == 0:
+                    for j in range(num_agents):
+                        p1_win = 0
+                        game_draw = 0
 
-                    for i in range(PLAY_WITH_MINIMAX):
-                        game = make_game(True, False, 'fair')
-                        game.main_loop(local_brain[j].actor_critic, pop_up)
+                        for i in range(PLAY_WITH_MINIMAX):
+                            game = make_game(True, False, 'fair')
+                            game.main_loop(local_brain[j].actor_critic, pop_up)
 
-                        if game.winner == 1:
-                            p1_win += 1
-                        elif game.winner is None:
-                            game_draw += 1
+                            if game.winner == 1:
+                                p1_win += 1
+                            elif game.winner is None:
+                                game_draw += 1
 
-                        writer[j].add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
+                        rating = p1_win/(PLAY_WITH_MINIMAX - game_draw)
+                        writer[j].add_scalar('minimax rating', rating, losscount)
 
             act_loss_sum = [0 for _ in range(num_agents)]
             entropy_sum = [0 for _ in range(num_agents)]

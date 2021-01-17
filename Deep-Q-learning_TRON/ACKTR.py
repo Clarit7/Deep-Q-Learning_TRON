@@ -358,17 +358,18 @@ def train(args):
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
-            if losscount%200 == 0:
-                for i in range(PLAY_WITH_MINIMAX):
-                    game = make_game(True, False, 'fair')
-                    game.main_loop(global_brain.actor_critic, pop_up)
+            with torch.no_grad():
+                if losscount%200 == 0:
+                    for i in range(PLAY_WITH_MINIMAX):
+                        game = make_game(True, False, 'fair')
+                        game.main_loop(global_brain.actor_critic, pop_up)
 
-                    if game.winner == 1:
-                        p1_win += 1
-                    elif game.winner is None:
-                        game_draw += 1
+                        if game.winner == 1:
+                            p1_win += 1
+                        elif game.winner is None:
+                            game_draw += 1
 
-                writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
+                    writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
 
             p1_win = 0
             game_draw = 0
