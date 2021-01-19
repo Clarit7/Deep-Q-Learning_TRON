@@ -84,10 +84,9 @@ class Brain(object):
         if acktr:
             self.optimizer = KFACOptimizer(self.actor_critic)
         else:
-            self.optimizer = optim.SGD(self.actor_critic.parameters(), lr=lr, momentum=0.9
-                                       )
+            # self.optimizer = optim.SGD(self.actor_critic.parameters(), lr=lr, momentum=0.9)
             # self.optimizer = optim.RMSprop(elf.actor_critic.parameters(), lr, eps=eps, alpha=alpha)
-            # self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=lr, eps=eps)
+            self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=lr, eps=eps)
 
     def update(self, rollouts):
         '''Advantage학습의 대상이 되는 5단계 모두를 사용하여 수정'''
@@ -125,19 +124,24 @@ class Brain(object):
         # advantage(행동가치-상태가치) 계산
         # advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 8])
 
-        advantages = rollouts.returns[:-1].to(device).transpose(1, 2).transpose(0, 1).unsqueeze(-1) - values
+        # advantages = (rollouts.returns[:-1].to(device).detach() - values).mean(2).unsqueeze(2)
+        # advantages = rollouts.returns[:-1].to(device).detach() - values
+        z_advantages = rollouts.returns[:-1].to(device).transpose(1, 2).transpose(0, 1).unsqueeze(-1).detach() - values
 
-        huber = torch.where(advantages.abs() < 1.0, 0.5 * advantages.pow(2), 1.0 * (advantages.abs() - 0.5 * 1.0)).to(device)
+        k = 2.0
+
+        huber = torch.where(z_advantages.abs() < k, 0.5 * z_advantages.pow(2), k * (z_advantages.abs() - 0.5 * k)).to(device)
 
         # Critic의 loss 계산
         # value_loss = advantages.pow(2).mean()
-        value_loss = huber * (tau - (advantages.detach() < 0).float()).abs()
+        value_loss = huber * (tau - (z_advantages.detach() < 0).float()).abs()
         value_loss = value_loss.mean()
 
         # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
 
-        radvantages = advantages.detach().mean()
-        action_gain = (action_log_probs * advantages.detach()).mean()
+        radvantages = z_advantages.detach().mean()
+        # action_advantage = advantages.detach().mean(0).mean(2).unsqueeze(2)
+        action_gain = (action_log_probs * z_advantages.detach()).mean()
 
         # detach 메서드를 호출하여 advantages를 상수로 취급
 
@@ -161,7 +165,8 @@ class Brain(object):
         self.optimizer.zero_grad()
 
         # 오차함수의 총합
-        total_loss = (value_loss * value_loss_coef - action_gain * policy_loss_coef - entropy * entropy_coef)
+        # total_loss = (value_loss * value_loss_coef - action_gain * policy_loss_coef - entropy * entropy_coef)
+        total_loss = (value_loss * value_loss_coef + entropy * entropy_coef)
 
         # 결합 가중치 수정
         total_loss.backward()  # 역전파 계산
@@ -204,15 +209,9 @@ def train(args):
 
     writer = SummaryWriter(eventid)
 
+    actor_critic = Net()  # 신경망 객체 생성
 
-    if args.m == "2":
-        actor_critic = Net2()  # 신경망 객체 생성
-    elif args.m == "3":
-        actor_critic = Net3()
-    else:
-        actor_critic = Net3()
-
-    global_brain = Brain(actor_critic,args, acktr=True)
+    global_brain = Brain(actor_critic,args, acktr=False)
 
     rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
