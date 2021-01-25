@@ -7,6 +7,7 @@ from datetime import datetime
 from Net.kfac import KFACOptimizer
 from tron.util import *
 from config import *
+from ACKTR_dist import train_dist
 
 import argparse
 
@@ -172,13 +173,12 @@ def train(args):
 
     writer = SummaryWriter(eventid)
 
-
     if args.m == "2":
         actor_critic = Net2()  # 신경망 객체 생성
     elif args.m == "3":
         actor_critic = Net3()
     else:
-        actor_critic = Net()
+        actor_critic = Net3()
 
     global_brain = Brain(actor_critic,args, acktr=True)
 
@@ -246,12 +246,18 @@ def train(args):
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len = envs[i].step(act1,act2)
+                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len, sep = envs[i].step(act1,act2)
 
                 each_step1[i] += 1
                 each_step2[i] += 1
 
                 if done_np[i]:
+                    '''
+                    To do: Implement get dist
+                    '''
+                    if sep:
+                        train_dist(envs[i])
+
                     reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
                     if i == 0:
                         gamecount += 1

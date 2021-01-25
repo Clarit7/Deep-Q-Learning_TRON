@@ -187,6 +187,7 @@ class Game:
             else:
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
 
+        sep = False
         if not done and self.check_separated(map_clone, self.pps[0]):
             winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             if winner == 1:
@@ -196,6 +197,7 @@ class Game:
             else:
                 self.pps[0].alive = False
                 self.pps[1].alive = False
+            sep = True
 
         self.history.append(HistoryElement(map_clone, None, None))
         self.next_p1 = self.history[-1].map.state_for_player(1)
@@ -219,7 +221,7 @@ class Game:
                             self.winner = 1
                         return False
 
-        return True
+        return True, sep
 
     def step(self, action_p1, action_p2):
 
@@ -227,10 +229,12 @@ class Game:
         alive = None
         self.reword = 10
 
-        if not self.next_frame(action_p1, action_p2):
+        is_next_frame, sep = self.next_frame(action_p1, action_p2)
+
+        if not is_next_frame:
             self.done = True
 
-            return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len
+            return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len, sep
 
         for pp in self.pps:
             if pp.alive:
@@ -245,7 +249,35 @@ class Game:
 
             self.done = True
 
-        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0
+        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0, sep
+
+    def step_dist(self, action_p1, action_p2):
+
+        alive_count = 0
+        alive = None
+        self.reword = 10
+
+        is_next_frame, sep = self.next_frame(action_p1, action_p2)
+
+        if not is_next_frame:
+            self.done = True
+
+            return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len, sep
+
+        for pp in self.pps:
+            if pp.alive:
+                alive_count += 1
+                alive = pp.id
+
+        if alive_count <= 1:
+            if alive_count == 1:
+                if self.pps[0].position[0] != self.pps[1].position[0] or \
+                        self.pps[0].position[1] != self.pps[1].position[1]:
+                    self.winner = alive
+
+            self.done = True
+
+        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0, sep
 
     def main_loop(self,model, pop=None,window=None,model2=None,condition=None):
 

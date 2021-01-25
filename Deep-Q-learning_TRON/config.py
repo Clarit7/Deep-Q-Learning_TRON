@@ -21,8 +21,8 @@ entropy_coef = 0.01
 policy_loss_coef = 1.2
 max_grad_norm = 0.5
 
-MAP_WIDTH = 20
-MAP_HEIGHT = 20
+MAP_WIDTH = 10
+MAP_HEIGHT = 10
 
 SHOW_ITER = 20
 
