@@ -1,7 +1,4 @@
-from Net.ACNet import *
 from torch import optim
-from torch.utils.tensorboard import SummaryWriter
-from datetime import datetime
 # from Net.DQNNet import Net as DQNNET
 
 from Net.kfac import KFACOptimizer
@@ -11,12 +8,10 @@ from config import *
 class RolloutStorage(object):
     '''Advantage 학습에 사용할 메모리 클래스'''
     def __init__(self, num_steps):
-
-        # self.observations = torch.zeros(num_steps + 1, num_processes,3,12,12)
         self.observations = torch.zeros(num_steps + 1, 1, MAP_WIDTH + 2, MAP_HEIGHT + 2)
-        self.masks = torch.ones(num_steps + 1, 1)
-        self.rewards = torch.zeros(num_steps, 1)
-        self.actions = torch.zeros(num_steps, 1).long()
+        self.masks = torch.ones(num_steps + 1, 1, 1)
+        self.rewards = torch.zeros(num_steps, 1, 1)
+        self.actions = torch.zeros(num_steps, 1, 1).long()
 
         # 할인 총보상 저장
         self.returns = torch.zeros(num_steps + 1, 1)
@@ -47,95 +42,6 @@ class RolloutStorage(object):
         for ad_step in reversed(range(self.rewards.size(0))):
             self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]
 
-# 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
-class Brain(object):
-    def __init__(self, ac_dist, acktr=False):
-        self.ac_dist = ac_dist.to(device)
-        #self.optimizer = optim.RMSprop(self.actor_critic.parameters(), lr=lr, eps=eps, alpha=alpha)
-
-        self.acktr = acktr
-
-        self.policy_loss_coef = policy_loss_coef
-        self.value_loss_coef = value_loss_coef
-
-        if acktr:
-            self.optimizer = KFACOptimizer(self.ac_dist)
-        else:
-            self.optimizer = optim.RMSprop(
-                self.ac_dist.parameters(), lr, eps=eps, alpha=alpha)
-
-    def get_dist(self):
-        dist = self.ac_dist()
-
-        return dist
-
-    def update(self, rollouts):
-        '''Advantage학습의 대상이 되는 5단계 모두를 사용하여 수정'''
-        num_steps = NUM_ADVANCED_STEP
-
-        values, action_log_probs, entropy = self.ac_dist.evaluate_actions(
-            rollouts.observations[:-1].view(-1, 3, MAP_WIDTH + 2, MAP_HEIGHT + 2).to(device).detach(),
-            rollouts.actions.view(-1, 1).to(device).detach())
-
-        # 주의 : 각 변수의 크기
-
-        # rollouts.observations[:-1].view(-1, 4) torch.Size([80, 4])
-        # rollouts.actions.view(-1, 1) torch.Size([80, 1])
-        # # values torch.Size([80, 1])
-        # action_log_probs torch.Size([80, 1])
-        # entropy torch.Size([])
-
-        values = values.view(num_steps, 1)  # torch.Size([160, 1]) ->([5, 32, 1])
-
-        action_log_probs = action_log_probs.view(num_steps, 1) # torch.Size([160, 1]) ->([5, 32, 1])
-
-        # advantage(행동가치-상태가치) 계산
-        advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 1])
-
-        # Critic의 loss 계산
-        value_loss = advantages.pow(2).mean()
-
-        # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
-
-        radvantages = advantages.detach().mean()
-        action_gain = (action_log_probs * advantages.detach()).mean()
-        # detach 메서드를 호출하여 advantages를 상수로 취급
-
-        if self.acktr and self.optimizer.steps % self.optimizer.Ts == 0:
-            # Compute fisher, see Martens 2014
-            self.ac_dist.zero_grad()
-            pg_fisher_loss = -action_log_probs.mean()
-
-            value_noise = torch.randn(values.size())
-            if values.is_cuda:
-                value_noise = value_noise.cuda()
-
-            sample_values = values + value_noise
-            vf_fisher_loss = -(values - sample_values.detach()).pow(2).mean()
-
-            fisher_loss = pg_fisher_loss + vf_fisher_loss
-            self.optimizer.acc_stats = True
-            fisher_loss.backward(retain_graph=True)
-            self.optimizer.acc_stats = False
-
-        self.optimizer.zero_grad()
-
-        # 오차함수의 총합
-        total_loss = (value_loss * value_loss_coef -
-                      action_gain * policy_loss_coef - entropy * entropy_coef)
-
-        # 결합 가중치 수정
-        total_loss.backward()  # 역전파 계산
-
-        # if self.acktr == False:
-        #     nn.utils.clip_grad_norm_(self.actor_critic.parameters(),
-        #                              self.max_grad_norm)
-
-        self.optimizer.step()  # 결합 가중치 수정
-
-        return total_loss,value_loss,action_gain,entropy,action_log_probs.mean(),radvantages
-
-
 def get_mask(game_map, x, y, mask):
     if game_map[x + 1, y] == 0:
         game_map[x + 1, y] = 1
@@ -160,7 +66,7 @@ def get_mask(game_map, x, y, mask):
     return mask
 
 
-def train_dist(env):
+def train_dist(env, global_brain, ac_dist, writer):
     '''실행 엔트리 포인트'''
     max_val = 0
     min_loss = 0
@@ -173,17 +79,6 @@ def train_dist(env):
 
     p1_win = 0
     game_draw = 0
-
-    ai_p1=True
-    ai_p2=True
-
-    eventid = datetime.now().strftime('runs/ACKTR_dist-%Y%m-%d%H-%M%S-ent ')
-
-    writer = SummaryWriter(eventid)
-
-    ac_dist = Net2()
-
-    global_brain = Brain(ac_dist, acktr=True)
 
     rollouts1 = RolloutStorage(NUM_ADVANCED_STEP)  # rollouts 객체
     episode_rewards1 = torch.zeros([1])  # 현재 에피소드의 보상
@@ -228,8 +123,8 @@ def train_dist(env):
     current_obs2 = static_obs2  # 가장 최근의 obs를 저장
 
     # advanced 학습에 사용되는 객체 rollouts 첫번째 상태에 현재 상태를 저장
-    rollouts1.observations[0].copy_(current_obs1)
-    rollouts2.observations[0].copy_(current_obs2)
+    rollouts1.observations[0].copy_(current_obs1.unsqueeze(0))
+    rollouts2.observations[0].copy_(current_obs2.unsqueeze(0))
     gamecount = 0
     losscount = 0
     duration = 0
@@ -237,13 +132,15 @@ def train_dist(env):
     reward_constants = reward_cons1
 
     # 1 에피소드에 해당하는 반복문
-    while True:  # 전체 for문
+    crash1, crash2 = False, False
+
+    while not crash1 and not crash2:  # 전체 for문
         # advanced 학습 대상이 되는 각 단계에 대해 계산
         for step in range(NUM_ADVANCED_STEP):
             # 행동을 선택
             with torch.no_grad():
-                action1 = ac_dist.act(rollouts1.observations[step])
-                action2 = ac_dist.act(rollouts2.observations[step])
+                action1 = ac_dist.act(rollouts1.observations[step].unsqueeze(0))
+                action2 = ac_dist.act(rollouts2.observations[step].unsqueeze(0))
 
             # (32,1)→(32,) -> tensor를 NumPy변수로
             actions1 = action1.squeeze(1).to('cpu').numpy()
@@ -253,12 +150,12 @@ def train_dist(env):
             act1 = actions1
             act2 = actions2
 
-            obs_np1, reward_np1, obs_np2, reward_np2, done_np, loser_len, winner_len, sep = env.step_dist(act1,act2)
+            obs_np1, reward_np1, obs_np2, reward_np2, done_np, loser_len, winner_len, sep, winner, true_done, crash1, crash2 = env.step_dist(act1,act2)
 
-            each_step1 += 1
-            each_step2 += 1
+            each_step1 += 1 if not crash1 else 0
+            each_step2 += 1 if not crash2 else 0
 
-            if done_np:
+            if done_np and true_done:
                 # if sep:
                 #     train_dist(env, ac_dist, global_brain)
                 reward_np1, reward_np2 = get_reward(env, reward_constants, winner_len, loser_len)
@@ -270,11 +167,6 @@ def train_dist(env):
                     print('%d Episode: Finished after %d steps' % (gamecount, each_step1))
                     writer.add_scalar('Duration', duration/SHOW_ITER, gamecount)
                     duration = 0
-
-                obs_np1 = env.map().state_for_player(1)
-                obs_np2 = env.map().state_for_player(2)
-                each_step1 = 0
-                each_step2 = 0
             else:
                 reward_np1 = -1  # 그 외의 경우는 보상 0 부여
                 reward_np2 = -1
@@ -316,16 +208,18 @@ def train_dist(env):
             current_obs2 = static_obs2  # 최신 상태의 obs를 저장
 
             # 메모리 객체에 현 단계의 transition을 저장
-            rollouts1.insert(current_obs1, action1.data, reward1, masks)
-            rollouts2.insert(current_obs2, action2.data, reward2, masks)
+            if not crash1:
+                rollouts1.insert(current_obs1.unsqueeze(0), action1.data, reward1, masks)
+            if not crash2:
+                rollouts2.insert(current_obs2.unsqueeze(0), action2.data, reward2, masks)
 
         # advanced 학습 for문 끝
 
         # advanced 학습 대상 중 마지막 단계의 상태로 예측하는 상태가치를 계산
 
         with torch.no_grad():
-            next_value1 = ac_dist.get_value(rollouts1.observations[-1])
-            next_value2 = ac_dist.get_value(rollouts2.observations[-1])
+            next_value1 = ac_dist.get_value(rollouts1.observations[-1].unsqueeze(0))
+            next_value2 = ac_dist.get_value(rollouts2.observations[-1].unsqueeze(0))
             # rollouts.observations의 크기는 torch.Size([6, 32, 4])
 
         # 모든 단계의 할인총보상을 계산하고, rollouts의 변수 returns를 업데이트
@@ -378,3 +272,5 @@ def train_dist(env):
 
         rollouts1.after_update()
         rollouts2.after_update()
+
+    return each_step1, each_step2

@@ -34,6 +34,7 @@ class PositionPlayer:
         self.player = player
         self.position = position
         self.alive = True
+        self.crash = False
 
     def body(self):
         if self.id == 1:
@@ -179,10 +180,10 @@ class Game:
         for (id, pp) in enumerate(self.pps):
             if pp.position[0] < 0 or pp.position[1] < 0 or \
                     pp.position[0] >= self.width or pp.position[1] >= self.height:
-                pp.alive, done = False, True
+                pp.alive, pp.crash, done = False, True, True
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
             elif map_clone[pp.position[0], pp.position[1]] is not Tile.EMPTY:
-                pp.alive, done = False, True
+                pp.alive, pp.crash, done = False, True, True
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
             else:
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
@@ -257,6 +258,11 @@ class Game:
         alive = None
         self.reword = 10
 
+        if self.pps[0].crash:
+            action_p1 = -1
+        if self.pps[1].crash:
+            action_p2 = -1
+
         is_next_frame, sep = self.next_frame(action_p1, action_p2)
 
         if not is_next_frame:
@@ -264,10 +270,12 @@ class Game:
 
             return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len, sep
 
+        true_done = True
         for pp in self.pps:
             if pp.alive:
                 alive_count += 1
                 alive = pp.id
+                true_done = False
 
         if alive_count <= 1:
             if alive_count == 1:
@@ -277,7 +285,7 @@ class Game:
 
             self.done = True
 
-        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0, sep
+        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0, sep, self.winner, true_done, self.pps[0].crash, self.pps[1].crash
 
     def main_loop(self,model, pop=None,window=None,model2=None,condition=None):
 

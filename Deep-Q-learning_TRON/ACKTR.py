@@ -144,6 +144,95 @@ class Brain(object):
         return total_loss,value_loss,action_gain,entropy,action_log_probs.mean(),radvantages
 
 
+# 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
+class Brain_dist(object):
+    def __init__(self, ac_dist, acktr=False):
+        self.ac_dist = ac_dist.to(device)
+        #self.optimizer = optim.RMSprop(self.actor_critic.parameters(), lr=lr, eps=eps, alpha=alpha)
+
+        self.acktr = acktr
+
+        self.policy_loss_coef = policy_loss_coef
+        self.value_loss_coef = value_loss_coef
+
+        if acktr:
+            self.optimizer = KFACOptimizer(self.ac_dist)
+        else:
+            self.optimizer = optim.RMSprop(
+                self.ac_dist.parameters(), lr, eps=eps, alpha=alpha)
+
+    def get_dist(self):
+        dist = self.ac_dist()
+
+        return dist
+
+    def update(self, rollouts):
+        '''Advantage학습의 대상이 되는 5단계 모두를 사용하여 수정'''
+        num_steps = NUM_ADVANCED_STEP
+
+        values, action_log_probs, entropy = self.ac_dist.evaluate_actions(
+            rollouts.observations[:-1].view(-1, 1, MAP_WIDTH + 2, MAP_HEIGHT + 2).to(device).detach(),
+            rollouts.actions.view(-1, 1).to(device).detach())
+
+        # 주의 : 각 변수의 크기
+
+        # rollouts.observations[:-1].view(-1, 4) torch.Size([80, 4])
+        # rollouts.actions.view(-1, 1) torch.Size([80, 1])
+        # # values torch.Size([80, 1])
+        # action_log_probs torch.Size([80, 1])
+        # entropy torch.Size([])
+
+        values = values.view(num_steps, 1)  # torch.Size([160, 1]) ->([5, 32, 1])
+
+        action_log_probs = action_log_probs.view(num_steps, 1) # torch.Size([160, 1]) ->([5, 32, 1])
+
+        # advantage(행동가치-상태가치) 계산
+        advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 1])
+
+        # Critic의 loss 계산
+        value_loss = advantages.pow(2).mean()
+
+        # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
+
+        radvantages = advantages.detach().mean()
+        action_gain = (action_log_probs * advantages.detach()).mean()
+        # detach 메서드를 호출하여 advantages를 상수로 취급
+
+        if self.acktr and self.optimizer.steps % self.optimizer.Ts == 0:
+            # Compute fisher, see Martens 2014
+            self.ac_dist.zero_grad()
+            pg_fisher_loss = -action_log_probs.mean()
+
+            value_noise = torch.randn(values.size())
+            if values.is_cuda:
+                value_noise = value_noise.cuda()
+
+            sample_values = values + value_noise
+            vf_fisher_loss = -(values - sample_values.detach()).pow(2).mean()
+
+            fisher_loss = pg_fisher_loss + vf_fisher_loss
+            self.optimizer.acc_stats = True
+            fisher_loss.backward(retain_graph=True)
+            self.optimizer.acc_stats = False
+
+        self.optimizer.zero_grad()
+
+        # 오차함수의 총합
+        total_loss = (value_loss * value_loss_coef -
+                      action_gain * policy_loss_coef - entropy * entropy_coef)
+
+        # 결합 가중치 수정
+        total_loss.backward()  # 역전파 계산
+
+        # if self.acktr == False:
+        #     nn.utils.clip_grad_norm_(self.actor_critic.parameters(),
+        #                              self.max_grad_norm)
+
+        self.optimizer.step()  # 결합 가중치 수정
+
+        return total_loss,value_loss,action_gain,entropy,action_log_probs.mean(),radvantages
+
+
 def train(args):
     '''실행 엔트리 포인트'''
     max_val = 0
@@ -226,6 +315,11 @@ def train(args):
     else:
         reward_constants = reward_cons1
 
+    eventid_dist = datetime.now().strftime('runs/ACKTR_dist-%Y%m-%d%H-%M%S-ent ')
+    writer_dist = SummaryWriter(eventid_dist)
+
+    ac_dist = Net2()
+    global_brain_dist = Brain_dist(ac_dist, acktr=True)
 
 
     # 1 에피소드에 해당하는 반복문
@@ -256,7 +350,7 @@ def train(args):
                     To do: Implement get dist
                     '''
                     if sep:
-                        train_dist(envs[i])
+                        p1_len, p2_len = train_dist(envs[i], global_brain_dist, ac_dist, writer_dist)
 
                     reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
                     if i == 0:

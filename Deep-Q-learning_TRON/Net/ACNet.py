@@ -140,7 +140,7 @@ class Net2(Net):
 
     def forward(self, x):
         '''신경망 순전파 계산을 정의'''
-        x = x.unsqueeze(1).to(device)
+        x = x.to(device)
 
         x = self.activation(self.conv1(x))
 
