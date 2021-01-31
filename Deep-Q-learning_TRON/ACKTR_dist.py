@@ -42,6 +42,35 @@ class RolloutStorage(object):
         for ad_step in reversed(range(self.rewards.size(0))):
             self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]
 
+def pop_up(map):
+    my=np.zeros((map.shape[0],map.shape[1]))
+    ener=np.zeros((map.shape[0],map.shape[1]))
+    wall=np.zeros((map.shape[0],map.shape[1]))
+
+    for i in range(len(map[0])):
+        for j in range(len(map[1])):
+            if(map[i][j]==-1):
+                wall[i][j]=1
+            elif (map[i][j] == -2):
+                my[i][j] = 1
+            elif (map[i][j] == -3):
+                ener[i][j] = 1
+            elif (map[i][j] == -10):
+                ener[i][j] = 10
+            elif (map[i][j] == 10):
+                my[i][j] = 10
+
+    wall=wall.reshape(1,wall.shape[0],wall.shape[1])
+    ener = ener.reshape(1, ener.shape[0], ener.shape[1])
+    my = my.reshape(1, my.shape[0], my.shape[1])
+
+    wall=torch.from_numpy(wall)
+    ener=torch.from_numpy(ener)
+    my=torch.from_numpy(my)
+
+    return np.concatenate((wall,my,ener),axis=0)
+
+
 def get_mask(game_map, x, y, mask):
     if game_map[x + 1, y] == 0:
         game_map[x + 1, y] = 1
@@ -96,6 +125,7 @@ def train_dist(env, global_brain, ac_dist, writer):
 
     # 초기 상태로부터 시작
 
+    test = env.map().state_for_player(1)
     obs1 = pop_up(env.map().state_for_player(1))
     obs1 = np.array(obs1)
     obs1 = torch.from_numpy(obs1).float()  # torch.Size([32, 4])
@@ -158,18 +188,20 @@ def train_dist(env, global_brain, ac_dist, writer):
             if done_np and true_done:
                 # if sep:
                 #     train_dist(env, ac_dist, global_brain)
-                reward_np1, reward_np2 = get_reward(env, reward_constants, winner_len, loser_len)
+                # reward_np1, reward_np2 = get_reward(env, reward_constants, winner_len, loser_len)
+                reward_np1 = -1
+                reward_np2 = -1
 
                 gamecount += 1
-                duration += each_step1+loser_len
+                duration += each_step1 + loser_len
 
                 if gamecount % SHOW_ITER == 0:
                     print('%d Episode: Finished after %d steps' % (gamecount, each_step1))
                     writer.add_scalar('Duration', duration/SHOW_ITER, gamecount)
                     duration = 0
             else:
-                reward_np1 = -1  # 그 외의 경우는 보상 0 부여
-                reward_np2 = -1
+                reward_np1 = 1  # 그 외의 경우는 보상 0 부여
+                reward_np2 = 1
 
             # 보상을 tensor로 변환하고, 에피소드의 총보상에 더해줌
             reward1 = torch.as_tensor(reward_np1).float()

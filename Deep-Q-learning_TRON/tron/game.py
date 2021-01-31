@@ -9,6 +9,7 @@ import torch
 import numpy as np
 import queue
 
+from ACKTR_dist import train_dist
 
 class SetQueue(queue.Queue):
     def _init(self, maxsize):
@@ -118,12 +119,9 @@ class Game:
             self.loser_len=p1_length
             self.winner_len=p2_length
             return 2
-
         elif p1_length > p2_length:
-
             self.loser_len=p2_length
             self.winner_len=p1_length
-
             return 1
         else:
             return 0
@@ -157,7 +155,7 @@ class Game:
 
         return max(l1, l2, l3, l4)
 
-    def next_frame(self, action_p1, action_p2, window=None):
+    def next_frame(self, action_p1, action_p2, window=None, selfplay=False, global_brain_dist=None, ac_dist=None, writer_dist=None):
 
         map_clone = self.map()
 
@@ -190,7 +188,18 @@ class Game:
 
         sep = False
         if not done and self.check_separated(map_clone, self.pps[0]):
-            winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+            if selfplay:
+                p1_len, p2_len = train_dist(self, global_brain_dist, ac_dist, writer_dist)
+                print("separated game, p1_len :", p1_len, ", p2_len :", p2_len)
+                if p1_len > p2_len:
+                    winner = 1
+                elif p2_len > p1_len:
+                    winner = 2
+                else:
+                    winner = 0
+            else:
+                winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+
             if winner == 1:
                 self.pps[1].alive = False
             elif winner == 2:
@@ -224,13 +233,13 @@ class Game:
 
         return True, sep
 
-    def step(self, action_p1, action_p2):
+    def step(self, action_p1, action_p2, selfplay=False, global_brain_dist=None, ac_dist=None, writer_dist=None):
 
         alive_count = 0
         alive = None
         self.reword = 10
 
-        is_next_frame, sep = self.next_frame(action_p1, action_p2)
+        is_next_frame, sep = self.next_frame(action_p1, action_p2, selfplay=selfplay, global_brain_dist=global_brain_dist, ac_dist=ac_dist, writer_dist=writer_dist)
 
         if not is_next_frame:
             self.done = True
@@ -250,7 +259,7 @@ class Game:
 
             self.done = True
 
-        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0, sep
+        return self.next_p1, self.reword, self.next_p2, self.reword, self.done, 0, 0, sep
 
     def step_dist(self, action_p1, action_p2):
 

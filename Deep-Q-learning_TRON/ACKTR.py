@@ -233,6 +233,35 @@ class Brain_dist(object):
         return total_loss,value_loss,action_gain,entropy,action_log_probs.mean(),radvantages
 
 
+def pop_up(map):
+    my=np.zeros((map.shape[0],map.shape[1]))
+    ener=np.zeros((map.shape[0],map.shape[1]))
+    wall=np.zeros((map.shape[0],map.shape[1]))
+
+    for i in range(len(map[0])):
+        for j in range(len(map[1])):
+            if(map[i][j]==-1):
+                wall[i][j]=1
+            elif (map[i][j] == -2):
+                my[i][j] = 1
+            elif (map[i][j] == -3):
+                ener[i][j] = 1
+            elif (map[i][j] == -10):
+                ener[i][j] = 10
+            elif (map[i][j] == 10):
+                my[i][j] = 10
+
+    wall=wall.reshape(1,wall.shape[0],wall.shape[1])
+    ener = ener.reshape(1, ener.shape[0], ener.shape[1])
+    my = my.reshape(1, my.shape[0], my.shape[1])
+
+    wall=torch.from_numpy(wall)
+    ener=torch.from_numpy(ener)
+    my=torch.from_numpy(my)
+
+    return np.concatenate((wall,my,ener),axis=0)
+
+
 def train(args):
     '''실행 엔트리 포인트'''
     max_val = 0
@@ -340,7 +369,7 @@ def train(args):
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len, sep = envs[i].step(act1,act2)
+                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i], loser_len, winner_len, sep = envs[i].step(act1,act2, selfplay=True, global_brain_dist=global_brain_dist, ac_dist=ac_dist, writer_dist=writer_dist)
 
                 each_step1[i] += 1
                 each_step2[i] += 1
@@ -349,10 +378,13 @@ def train(args):
                     '''
                     To do: Implement get dist
                     '''
+                    p1_len, p2_len = 0, 0
+                    """
                     if sep:
                         p1_len, p2_len = train_dist(envs[i], global_brain_dist, ac_dist, writer_dist)
+                    """
+                    reward_np1[i], reward_np2[i] = get_reward(envs[i], reward_constants, sep, p1_len, p2_len)
 
-                    reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
                     if i == 0:
                         gamecount += 1
                         duration += each_step1[i]+loser_len
