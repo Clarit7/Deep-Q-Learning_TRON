@@ -77,6 +77,9 @@ class Net(nn.Module):
         # actor_output=torch.clamp_min_(actor_output,min=0)
         # dim=1이므로 행동의 종류에 대해 softmax를 적용
         action_probs = F.softmax(actor_output, dim=1)
+        action_probs = F.relu(action_probs)
+        action_probs = torch.where(torch.isnan(action_probs), torch.ones(1).float().to(device), action_probs)
+        action_probs = torch.where(torch.isinf(action_probs), torch.ones(1).float().to(device), action_probs)
         action = action_probs.multinomial(num_samples=1)  # dim=1이므로 행동의 종류에 대해 확률을 계산
         return action
 
@@ -111,21 +114,21 @@ class Net2(Net):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(1, 8, 3, padding=1)
+        self.conv1 = nn.Conv2d(2, 32, 3, padding=1)
 
-        self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
-        self.conv3 = nn.Conv2d(8, 8, 3, padding=1)
+        self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv3 = nn.Conv2d(32, 32, 3, padding=1)
 
-        self.conv4 = nn.Conv2d(8, 32, 3, padding=1)
+        self.conv4 = nn.Conv2d(32, 64, 3, padding=1)
 
-        self.conv5 = nn.Conv2d(32, 32, 3, padding=1)
-        self.conv6 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
+        self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
 
         self.pool = nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
 
-        self.conv7 = nn.Conv2d(32, 32, 7, padding=3, stride=2)
+        self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
 
-        self.fc1 = nn.Linear(32 * 3 * 3, 256)
+        self.fc1 = nn.Linear(64 * 3 * 3, 256)
         self.fc2 = nn.Linear(256, 128)
 
         self.actor1 = nn.Linear(128, 64)
@@ -160,7 +163,7 @@ class Net2(Net):
 
         x = self.activation(self.conv7(x))
 
-        x = x.view(-1, 32 * 3 * 3)
+        x = x.view(-1, 64 * 3 * 3)
 
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))

@@ -59,6 +59,44 @@ class RolloutStorage(object):
         for ad_step in reversed(range(self.rewards.size(0))):
             self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]
 
+class RolloutStorageDist(object):
+    '''Advantage 학습에 사용할 메모리 클래스'''
+    def __init__(self, num_steps):
+        self.observations = torch.zeros(num_steps + 1, 2, MAP_WIDTH + 2, MAP_HEIGHT + 2)
+        self.masks = torch.ones(num_steps + 1, 1, 1)
+        self.rewards = torch.zeros(num_steps, 1, 1)
+        self.actions = torch.zeros(num_steps, 1, 1).long()
+
+        # 할인 총보상 저장
+        self.returns = torch.zeros(num_steps + 1, 1)
+        self.index = 0  # insert할 인덱스
+
+    def insert(self, current_obs, action, reward, mask):
+        '''현재 인덱스 위치에 transition을 저장'''
+
+        self.observations[self.index + 1].copy_(current_obs)
+        self.masks[self.index + 1].copy_(mask)
+        self.rewards[self.index].copy_(reward)
+        self.actions[self.index].copy_(action)
+        self.index = (self.index + 1) % NUM_ADVANCED_STEP  # 인덱스 값 업데이트
+
+    def after_update(self):
+        '''Advantage학습 단계만큼 단계가 진행되면 가장 새로운 transition을 index0에 저장'''
+        self.observations[0].copy_(self.observations[-1])
+        self.masks[0].copy_(self.masks[-1])
+
+    def compute_returns(self, next_value):
+        '''Advantage학습 범위 안의 각 단계에 대해 할인 총보상을 계산'''
+
+        # 주의 : 5번째 단계부터 거슬러 올라오며 계산
+        # 주의 : 5번째 단계가 Advantage1, 4번째 단계는 Advantage2가 됨
+
+        self.returns[-1] = next_value
+
+        for ad_step in reversed(range(self.rewards.size(0))):
+            self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]
+
+
 # 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
 class Brain(object):
     def __init__(self, actor_critic,args, acktr=False):
@@ -171,7 +209,7 @@ class Brain_dist(object):
         num_steps = NUM_ADVANCED_STEP
 
         values, action_log_probs, entropy = self.ac_dist.evaluate_actions(
-            rollouts.observations[:-1].view(-1, 1, MAP_WIDTH + 2, MAP_HEIGHT + 2).to(device).detach(),
+            rollouts.observations[:-1].view(-1, 2, MAP_WIDTH + 2, MAP_HEIGHT + 2).to(device).detach(),
             rollouts.actions.view(-1, 1).to(device).detach())
 
         # 주의 : 각 변수의 크기
@@ -234,32 +272,51 @@ class Brain_dist(object):
 
 
 def pop_up(map):
-    my=np.zeros((map.shape[0],map.shape[1]))
-    ener=np.zeros((map.shape[0],map.shape[1]))
-    wall=np.zeros((map.shape[0],map.shape[1]))
+    my = np.zeros((map.shape[0],map.shape[1]))
+    enem = np.zeros((map.shape[0],map.shape[1]))
+    wall = np.zeros((map.shape[0],map.shape[1]))
+
+    find_my_head = False
+    find_enem_head = False
 
     for i in range(len(map[0])):
         for j in range(len(map[1])):
-            if(map[i][j]==-1):
+            if map[i][j] == -1:
                 wall[i][j]=1
-            elif (map[i][j] == -2):
+            elif map[i][j] == -2:
                 my[i][j] = 1
-            elif (map[i][j] == -3):
-                ener[i][j] = 1
-            elif (map[i][j] == -10):
-                ener[i][j] = 10
-            elif (map[i][j] == 10):
+            elif map[i][j] == -3:
+                enem[i][j] = 1
+            elif map[i][j] == -10:
+                enem[i][j] = 10
+                find_enem_head = True
+                head_i = i
+                head_j = j
+                if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
+                    wall[i][j] = 1
+            elif map[i][j] == 10:
                 my[i][j] = 10
+                find_my_head = True
+                head_i = i
+                head_j = j
+                if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
+                    wall[i][j] = 1
 
-    wall=wall.reshape(1,wall.shape[0],wall.shape[1])
-    ener = ener.reshape(1, ener.shape[0], ener.shape[1])
+    if not find_enem_head:
+        enem[head_i][head_j] = 10
+
+    if not find_my_head:
+        my[head_i][head_j] = 10
+
+    wall = wall.reshape(1,wall.shape[0],wall.shape[1])
+    enem = enem.reshape(1, enem.shape[0], enem.shape[1])
     my = my.reshape(1, my.shape[0], my.shape[1])
 
-    wall=torch.from_numpy(wall)
-    ener=torch.from_numpy(ener)
-    my=torch.from_numpy(my)
+    wall = torch.from_numpy(wall)
+    enem = torch.from_numpy(enem)
+    my = torch.from_numpy(my)
 
-    return np.concatenate((wall,my,ener),axis=0)
+    return np.concatenate((wall,my,enem),axis=0)
 
 
 def train(args):
@@ -336,6 +393,8 @@ def train(args):
     gamecount = 0
     losscount = 0
     duration = 0
+    distcount = 0
+    loss_dict = {'loss' : 0.0, 'value' : 0.0, 'act_gain' : 0.0, 'entropy' : 0.0, 'prob' : 0.0, 'advan' : 0.0, 'duration' : 0.0, 'update' : 0}
 
     if args.r == "2":
         reward_constants = reward_cons2
@@ -350,6 +409,11 @@ def train(args):
     ac_dist = Net2()
     global_brain_dist = Brain_dist(ac_dist, acktr=True)
 
+    rollouts1_dist = RolloutStorageDist(NUM_ADVANCED_STEP)  # rollouts 객체
+    rollouts2_dist = RolloutStorageDist(NUM_ADVANCED_STEP)  # rollouts 객체
+
+    last_act1=None
+    last_act2=None
 
     # 1 에피소드에 해당하는 반복문
     while True:  # 전체 for문
@@ -369,7 +433,10 @@ def train(args):
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i], loser_len, winner_len, sep = envs[i].step(act1,act2, selfplay=True, global_brain_dist=global_brain_dist, ac_dist=ac_dist, writer_dist=writer_dist)
+                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i], loser_len, winner_len, sep, distcount, p1_len, p2_len, loss_dict, last_act1, last_act2 \
+                    = envs[i].step(act1,act2, selfplay=True, global_brain_dist=global_brain_dist, ac_dist=ac_dist,
+                                   writer_dist=writer_dist, distcount=distcount, loss_dict=loss_dict,
+                                   rollouts1_dist=rollouts1_dist, rollouts2_dist=rollouts2_dist, last_act1=last_act1, last_act2=last_act2)
 
                 each_step1[i] += 1
                 each_step2[i] += 1
@@ -378,7 +445,6 @@ def train(args):
                     '''
                     To do: Implement get dist
                     '''
-                    p1_len, p2_len = 0, 0
                     """
                     if sep:
                         p1_len, p2_len = train_dist(envs[i], global_brain_dist, ac_dist, writer_dist)
@@ -467,11 +533,11 @@ def train(args):
         #
         #     game.main_loop(global_brain.actor_critic, pop_up, window)
 
-        if losscount%SHOW_ITER == 0:
-            total_loss_sum1 = total_loss_sum1 / SHOW_ITER
-            val_loss_sum1 = val_loss_sum1 / SHOW_ITER
-            act_loss_sum1 = act_loss_sum1 / SHOW_ITER
-            entropy_sum1 = entropy_sum1 / SHOW_ITER
+        if losscount % SHOW_ITER == 0:
+            total_loss_sum1 /= SHOW_ITER
+            val_loss_sum1 /= SHOW_ITER
+            act_loss_sum1 /= SHOW_ITER
+            entropy_sum1 /= SHOW_ITER
             prob1_loss_sum1 /= SHOW_ITER
             advan_loss_sum1 /= SHOW_ITER
 
@@ -514,7 +580,6 @@ def train(args):
 
         rollouts1.after_update()
         rollouts2.after_update()
-
 
 def main():
     parser = argparse.ArgumentParser()
