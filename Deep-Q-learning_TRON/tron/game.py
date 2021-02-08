@@ -9,7 +9,6 @@ import torch
 import numpy as np
 import queue
 
-from ACKTR_dist import train_dist
 
 class SetQueue(queue.Queue):
     def _init(self, maxsize):
@@ -35,7 +34,6 @@ class PositionPlayer:
         self.player = player
         self.position = position
         self.alive = True
-        self.crash = False
 
     def body(self):
         if self.id == 1:
@@ -70,7 +68,7 @@ class Game:
         self.winner_len = 0
         self.next_p1 = []
         self.next_p2 = []
-        self.reward = 0
+        self.reword = 0
         self.done = False
 
         for pp in self.pps:
@@ -119,9 +117,12 @@ class Game:
             self.loser_len=p1_length
             self.winner_len=p2_length
             return 2
+
         elif p1_length > p2_length:
+
             self.loser_len=p2_length
             self.winner_len=p1_length
+
             return 1
         else:
             return 0
@@ -155,9 +156,7 @@ class Game:
 
         return max(l1, l2, l3, l4)
 
-    def next_frame(self, action_p1, action_p2, window=None, selfplay=False, global_brain_dist=None, ac_dist=None,
-                   writer_dist=None, distcount=0, loss_dict=None,  rollouts1_dist=None, rollouts2_dist=None,
-                   last_act1=None, last_act2=None):
+    def next_frame(self, action_p1, action_p2, window=None):
 
         map_clone = self.map()
 
@@ -180,37 +179,16 @@ class Game:
         for (id, pp) in enumerate(self.pps):
             if pp.position[0] < 0 or pp.position[1] < 0 or \
                     pp.position[0] >= self.width or pp.position[1] >= self.height:
-                pp.alive, pp.crash, done = False, True, True
+                pp.alive, done = False, True
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
             elif map_clone[pp.position[0], pp.position[1]] is not Tile.EMPTY:
-                pp.alive, pp.crash, done = False, True, True
+                pp.alive, done = False, True
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
             else:
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
 
-        self.history.append(HistoryElement(map_clone, None, None))
-        self.next_p1 = self.history[-1].map.state_for_player(1)
-        self.next_p2 = self.history[-1].map.state_for_player(2)
-
-        sep = False
-        p1_len, p2_len = 0, 0
         if not done and self.check_separated(map_clone, self.pps[0]):
-            if selfplay:
-                p1_len, p2_len, loss_dict, last_act1, last_act2 \
-                    = train_dist(self, global_brain_dist, ac_dist, writer_dist, distcount, loss_dict,
-                                 rollouts1_dist=rollouts1_dist, rollouts2_dist=rollouts2_dist,
-                                 last_act1=last_act1, last_act2=last_act2)
-                if p1_len > p2_len:
-                    winner = 1
-                elif p2_len > p1_len:
-                    winner = 2
-                else:
-                    winner = 0
-
-                distcount += 1
-            else:
-                winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
-
+            winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             if winner == 1:
                 self.pps[1].alive = False
             elif winner == 2:
@@ -218,7 +196,10 @@ class Game:
             else:
                 self.pps[0].alive = False
                 self.pps[1].alive = False
-            sep = True
+
+        self.history.append(HistoryElement(map_clone, None, None))
+        self.next_p1 = self.history[-1].map.state_for_player(1)
+        self.next_p2 = self.history[-1].map.state_for_player(2)
 
         if window:
             import pygame
@@ -238,24 +219,18 @@ class Game:
                             self.winner = 1
                         return False
 
-        return True, sep, distcount, p1_len, p2_len, loss_dict, last_act1, last_act2
+        return True
 
-    def step(self, action_p1, action_p2, selfplay=False, global_brain_dist=None, ac_dist=None, writer_dist=None, distcount=0, loss_dict=None,
-             rollouts1_dist=None, rollouts2_dist=None, last_act1=None, last_act2=None):
+    def step(self, action_p1, action_p2):
 
         alive_count = 0
         alive = None
-        self.reward = 10
+        self.reword = 10
 
-        is_next_frame, sep, distcount, p1_len, p2_len, loss_dict, last_act1, last_act2 \
-            = self.next_frame(action_p1, action_p2, selfplay=selfplay, global_brain_dist=global_brain_dist, ac_dist=ac_dist,
-                              writer_dist=writer_dist, distcount=distcount, loss_dict=loss_dict,
-                              rollouts1_dist=rollouts1_dist, rollouts2_dist=rollouts2_dist, last_act1=last_act1, last_act2=last_act2)
-
-        if not is_next_frame:
+        if not self.next_frame(action_p1, action_p2):
             self.done = True
 
-            return self.next_p1, self.reward, self.next_p2, self.reward, self.done, self.loser_len, self.winner_len, sep
+            return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len
 
         for pp in self.pps:
             if pp.alive:
@@ -270,48 +245,14 @@ class Game:
 
             self.done = True
 
-        return self.next_p1, self.reward, self.next_p2, self.reward, self.done, 0, 0, sep, distcount, p1_len, p2_len, loss_dict, last_act1, last_act2
-
-    def step_dist(self, action_p1, action_p2):
-        alive_count = 0
-        alive = None
-        self.reward = 10
-
-        if self.pps[0].crash:
-            action_p1 = -1
-        if self.pps[1].crash:
-            action_p2 = -1
-
-        is_next_frame, sep, _, _, _, _, _, _ = self.next_frame(action_p1, action_p2)
-
-        if not is_next_frame:
-            self.done = True
-
-            return self.next_p1, self.next_p2, self.done, sep, true_done, self.pps[0].crash, self.pps[1].crash
-
-        true_done = True
-        for pp in self.pps:
-            if pp.alive:
-                alive_count += 1
-                alive = pp.id
-                true_done = False
-
-        if alive_count <= 1:
-            if alive_count == 1:
-                if self.pps[0].position[0] != self.pps[1].position[0] or \
-                        self.pps[0].position[1] != self.pps[1].position[1]:
-                    self.winner = alive
-
-            self.done = True
-
-        return self.next_p1, self.next_p2, self.done, sep, true_done, self.pps[0].crash, self.pps[1].crash
+        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0
 
     def main_loop(self,model, pop=None,window=None,model2=None,condition=None):
 
         if window:
             window.render_map(self.map())
 
-        if not model2:
+        if (not model2):
             model2=model
 
         while True:
@@ -323,14 +264,15 @@ class Game:
 
             map=self.map()
 
-            if pop == None:
+            if(pop == None):
                 with torch.no_grad():
                     action1 = model.act(torch.tensor(np.reshape(map.state_for_player(1), (1, 1, map.state_for_player(1).shape[0],
                                                                                           map.state_for_player(1).shape[1]))).float())
                     action2 = model2.act(torch.tensor(np.reshape(map.state_for_player(2), (1, 1, map.state_for_player(2).shape[0],
                                                                                           map.state_for_player(2).shape[1]))).float())
+
             else:
-                if condition:
+                if(condition):
                     with torch.no_grad():
                         action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
 
@@ -340,9 +282,11 @@ class Game:
                                                                                   map.state_for_player(2).shape[1]))).float())
                         elif condition[1]=="AC":
                             action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
+
                 else:
                     action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
                     action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
+
 
             if not self.next_frame(action1,action2,window):
                 break

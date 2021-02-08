@@ -2,7 +2,6 @@ from enum import Enum
 
 
 class Direction(Enum):
-    STOP = 0
     UP = 1
     RIGHT = 2
     DOWN = 3
@@ -108,8 +107,6 @@ class ACPlayer(Player):
     def get_direction(self,next_action):
         next_action=next_action+1
 
-        if next_action == 0:
-            next_direction = Direction.STOP
         if next_action == 1:
             next_direction = Direction.UP
         if next_action == 2:
@@ -125,9 +122,7 @@ class ACPlayer(Player):
         return self.next_position(current_position, direction), direction
 
     def next_position(self, current_position, direction):
-        if direction == Direction.STOP:
-            return current_position[0], current_position[1]
-        elif direction == Direction.UP:
+        if direction == Direction.UP:
             return current_position[0] - 1, current_position[1]
         elif direction == Direction.RIGHT:
             return current_position[0], current_position[1] + 1

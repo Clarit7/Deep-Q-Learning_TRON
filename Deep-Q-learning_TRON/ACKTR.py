@@ -7,7 +7,6 @@ from datetime import datetime
 from Net.kfac import KFACOptimizer
 from tron.util import *
 from config import *
-from ACKTR_dist import train_dist
 
 import argparse
 
@@ -25,7 +24,7 @@ class RolloutStorage(object):
     def __init__(self, num_steps, num_processes):
 
         # self.observations = torch.zeros(num_steps + 1, num_processes,3,12,12)
-        self.observations = torch.zeros(num_steps + 1, num_processes, 3, MAP_WIDTH + 2, MAP_HEIGHT + 2)
+        self.observations = torch.zeros(num_steps + 1, num_processes, 3, 12, 12)
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
         self.rewards = torch.zeros(num_steps, num_processes, 1)
         self.actions = torch.zeros(num_steps, num_processes, 1).long()
@@ -59,44 +58,6 @@ class RolloutStorage(object):
         for ad_step in reversed(range(self.rewards.size(0))):
             self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]
 
-class RolloutStorageDist(object):
-    '''Advantage 학습에 사용할 메모리 클래스'''
-    def __init__(self, num_steps):
-        self.observations = torch.zeros(num_steps + 1, 2, MAP_WIDTH + 2, MAP_HEIGHT + 2)
-        self.masks = torch.ones(num_steps + 1, 1, 1)
-        self.rewards = torch.zeros(num_steps, 1, 1)
-        self.actions = torch.zeros(num_steps, 1, 1).long()
-
-        # 할인 총보상 저장
-        self.returns = torch.zeros(num_steps + 1, 1)
-        self.index = 0  # insert할 인덱스
-
-    def insert(self, current_obs, action, reward, mask):
-        '''현재 인덱스 위치에 transition을 저장'''
-
-        self.observations[self.index + 1].copy_(current_obs)
-        self.masks[self.index + 1].copy_(mask)
-        self.rewards[self.index].copy_(reward)
-        self.actions[self.index].copy_(action)
-        self.index = (self.index + 1) % NUM_ADVANCED_STEP  # 인덱스 값 업데이트
-
-    def after_update(self):
-        '''Advantage학습 단계만큼 단계가 진행되면 가장 새로운 transition을 index0에 저장'''
-        self.observations[0].copy_(self.observations[-1])
-        self.masks[0].copy_(self.masks[-1])
-
-    def compute_returns(self, next_value):
-        '''Advantage학습 범위 안의 각 단계에 대해 할인 총보상을 계산'''
-
-        # 주의 : 5번째 단계부터 거슬러 올라오며 계산
-        # 주의 : 5번째 단계가 Advantage1, 4번째 단계는 Advantage2가 됨
-
-        self.returns[-1] = next_value
-
-        for ad_step in reversed(range(self.rewards.size(0))):
-            self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]
-
-
 # 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
 class Brain(object):
     def __init__(self, actor_critic,args, acktr=False):
@@ -120,7 +81,7 @@ class Brain(object):
         num_processes = NUM_PROCESSES
 
         values, action_log_probs, entropy = self.actor_critic.evaluate_actions(
-            rollouts.observations[:-1].view(-1, 3, MAP_WIDTH + 2, MAP_HEIGHT + 2).to(device).detach(),
+            rollouts.observations[:-1].view(-1, 3, 12, 12).to(device).detach(),
             rollouts.actions.view(-1, 1).to(device).detach())
 
         # 주의 : 각 변수의 크기
@@ -139,12 +100,13 @@ class Brain(object):
         advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 1])
 
         # Critic의 loss 계산
-        value_loss = advantages.pow(2).mean()
+        value_loss = advantages.mean()
 
         # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
 
         radvantages = advantages.detach().mean()
         action_gain = (action_log_probs * advantages.detach()).mean()
+
         # detach 메서드를 호출하여 advantages를 상수로 취급
 
         if self.acktr and self.optimizer.steps % self.optimizer.Ts == 0:
@@ -167,8 +129,7 @@ class Brain(object):
         self.optimizer.zero_grad()
 
         # 오차함수의 총합
-        total_loss = (value_loss * value_loss_coef -
-                      action_gain * policy_loss_coef - entropy * entropy_coef)
+        total_loss = (value_loss * value_loss_coef - action_gain * policy_loss_coef - entropy * entropy_coef)
 
         # 결합 가중치 수정
         total_loss.backward()  # 역전파 계산
@@ -180,143 +141,6 @@ class Brain(object):
         self.optimizer.step()  # 결합 가중치 수정
 
         return total_loss,value_loss,action_gain,entropy,action_log_probs.mean(),radvantages
-
-
-# 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
-class Brain_dist(object):
-    def __init__(self, ac_dist, acktr=False):
-        self.ac_dist = ac_dist.to(device)
-        #self.optimizer = optim.RMSprop(self.actor_critic.parameters(), lr=lr, eps=eps, alpha=alpha)
-
-        self.acktr = acktr
-
-        self.policy_loss_coef = policy_loss_coef
-        self.value_loss_coef = value_loss_coef
-
-        if acktr:
-            self.optimizer = KFACOptimizer(self.ac_dist)
-        else:
-            self.optimizer = optim.RMSprop(
-                self.ac_dist.parameters(), lr, eps=eps, alpha=alpha)
-
-    def get_dist(self):
-        dist = self.ac_dist()
-
-        return dist
-
-    def update(self, rollouts):
-        '''Advantage학습의 대상이 되는 5단계 모두를 사용하여 수정'''
-        num_steps = NUM_ADVANCED_STEP
-
-        values, action_log_probs, entropy = self.ac_dist.evaluate_actions(
-            rollouts.observations[:-1].view(-1, 2, MAP_WIDTH + 2, MAP_HEIGHT + 2).to(device).detach(),
-            rollouts.actions.view(-1, 1).to(device).detach())
-
-        # 주의 : 각 변수의 크기
-
-        # rollouts.observations[:-1].view(-1, 4) torch.Size([80, 4])
-        # rollouts.actions.view(-1, 1) torch.Size([80, 1])
-        # # values torch.Size([80, 1])
-        # action_log_probs torch.Size([80, 1])
-        # entropy torch.Size([])
-
-        values = values.view(num_steps, 1)  # torch.Size([160, 1]) ->([5, 32, 1])
-
-        action_log_probs = action_log_probs.view(num_steps, 1) # torch.Size([160, 1]) ->([5, 32, 1])
-
-        # advantage(행동가치-상태가치) 계산
-        advantages = rollouts.returns[:-1].to(device).detach() - values  # torch.Size([5, 32, 1])
-
-        # Critic의 loss 계산
-        value_loss = advantages.pow(2).mean()
-
-        # Actor의 gain 계산, 나중에 -1을 곱하면 loss가 된다
-
-        radvantages = advantages.detach().mean()
-        action_gain = (action_log_probs * advantages.detach()).mean()
-        # detach 메서드를 호출하여 advantages를 상수로 취급
-
-        if self.acktr and self.optimizer.steps % self.optimizer.Ts == 0:
-            # Compute fisher, see Martens 2014
-            self.ac_dist.zero_grad()
-            pg_fisher_loss = -action_log_probs.mean()
-
-            value_noise = torch.randn(values.size())
-            if values.is_cuda:
-                value_noise = value_noise.cuda()
-
-            sample_values = values + value_noise
-            vf_fisher_loss = -(values - sample_values.detach()).pow(2).mean()
-
-            fisher_loss = pg_fisher_loss + vf_fisher_loss
-            self.optimizer.acc_stats = True
-            fisher_loss.backward(retain_graph=True)
-            self.optimizer.acc_stats = False
-
-        self.optimizer.zero_grad()
-
-        # 오차함수의 총합
-        total_loss = (value_loss * value_loss_coef -
-                      action_gain * policy_loss_coef - entropy * entropy_coef)
-
-        # 결합 가중치 수정
-        total_loss.backward()  # 역전파 계산
-
-        # if self.acktr == False:
-        #     nn.utils.clip_grad_norm_(self.actor_critic.parameters(),
-        #                              self.max_grad_norm)
-
-        self.optimizer.step()  # 결합 가중치 수정
-
-        return total_loss,value_loss,action_gain,entropy,action_log_probs.mean(),radvantages
-
-
-def pop_up(map):
-    my = np.zeros((map.shape[0],map.shape[1]))
-    enem = np.zeros((map.shape[0],map.shape[1]))
-    wall = np.zeros((map.shape[0],map.shape[1]))
-
-    find_my_head = False
-    find_enem_head = False
-
-    for i in range(len(map[0])):
-        for j in range(len(map[1])):
-            if map[i][j] == -1:
-                wall[i][j]=1
-            elif map[i][j] == -2:
-                my[i][j] = 1
-            elif map[i][j] == -3:
-                enem[i][j] = 1
-            elif map[i][j] == -10:
-                enem[i][j] = 10
-                find_enem_head = True
-                head_i = i
-                head_j = j
-                if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
-                    wall[i][j] = 1
-            elif map[i][j] == 10:
-                my[i][j] = 10
-                find_my_head = True
-                head_i = i
-                head_j = j
-                if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
-                    wall[i][j] = 1
-
-    if not find_enem_head:
-        enem[head_i][head_j] = 10
-
-    if not find_my_head:
-        my[head_i][head_j] = 10
-
-    wall = wall.reshape(1,wall.shape[0],wall.shape[1])
-    enem = enem.reshape(1, enem.shape[0], enem.shape[1])
-    my = my.reshape(1, my.shape[0], my.shape[1])
-
-    wall = torch.from_numpy(wall)
-    enem = torch.from_numpy(enem)
-    my = torch.from_numpy(my)
-
-    return np.concatenate((wall,my,enem),axis=0)
 
 
 def train(args):
@@ -348,24 +172,25 @@ def train(args):
 
     writer = SummaryWriter(eventid)
 
+
     if args.m == "2":
         actor_critic = Net2()  # 신경망 객체 생성
     elif args.m == "3":
         actor_critic = Net3()
     else:
-        actor_critic = Net3()
+        actor_critic = Net()
 
-    global_brain = Brain(actor_critic,args, acktr=True)
+    global_brain = Brain(actor_critic,args, acktr=False)
 
     rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
-    obs_np1 = np.zeros([NUM_PROCESSES,MAP_WIDTH + 2,MAP_HEIGHT + 2])  # Numpy 배열 # 게임 상황이 12x12임
+    obs_np1 = np.zeros([NUM_PROCESSES,12,12])  # Numpy 배열 # 게임 상황이 12x12임
     reward_np1 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
     each_step1 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
 
     rollouts2 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards2 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
-    obs_np2 = np.zeros([NUM_PROCESSES,MAP_WIDTH + 2, MAP_HEIGHT + 2])  # Numpy 배열 # 게임 상황이 12x12임
+    obs_np2 = np.zeros([NUM_PROCESSES,12, 12])  # Numpy 배열 # 게임 상황이 12x12임
     reward_np2 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
     each_step2 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
 
@@ -393,8 +218,6 @@ def train(args):
     gamecount = 0
     losscount = 0
     duration = 0
-    distcount = 0
-    loss_dict = {'loss' : 0.0, 'value' : 0.0, 'act_gain' : 0.0, 'entropy' : 0.0, 'prob' : 0.0, 'advan' : 0.0, 'duration' : 0.0, 'update' : 0}
 
     if args.r == "2":
         reward_constants = reward_cons2
@@ -403,17 +226,7 @@ def train(args):
     else:
         reward_constants = reward_cons1
 
-    eventid_dist = datetime.now().strftime('runs/ACKTR_dist-%Y%m-%d%H-%M%S-ent ')
-    writer_dist = SummaryWriter(eventid_dist)
 
-    ac_dist = Net2()
-    global_brain_dist = Brain_dist(ac_dist, acktr=True)
-
-    rollouts1_dist = RolloutStorageDist(NUM_ADVANCED_STEP)  # rollouts 객체
-    rollouts2_dist = RolloutStorageDist(NUM_ADVANCED_STEP)  # rollouts 객체
-
-    last_act1=None
-    last_act2=None
 
     # 1 에피소드에 해당하는 반복문
     while True:  # 전체 for문
@@ -433,24 +246,13 @@ def train(args):
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i], loser_len, winner_len, sep, distcount, p1_len, p2_len, loss_dict, last_act1, last_act2 \
-                    = envs[i].step(act1,act2, selfplay=True, global_brain_dist=global_brain_dist, ac_dist=ac_dist,
-                                   writer_dist=writer_dist, distcount=distcount, loss_dict=loss_dict,
-                                   rollouts1_dist=rollouts1_dist, rollouts2_dist=rollouts2_dist, last_act1=last_act1, last_act2=last_act2)
+                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len = envs[i].step(act1,act2)
 
                 each_step1[i] += 1
                 each_step2[i] += 1
 
                 if done_np[i]:
-                    '''
-                    To do: Implement get dist
-                    '''
-                    """
-                    if sep:
-                        p1_len, p2_len = train_dist(envs[i], global_brain_dist, ac_dist, writer_dist)
-                    """
-                    reward_np1[i], reward_np2[i] = get_reward(envs[i], reward_constants, sep, p1_len, p2_len)
-
+                    reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
                     if i == 0:
                         gamecount += 1
                         duration += each_step1[i]+loser_len
@@ -533,11 +335,11 @@ def train(args):
         #
         #     game.main_loop(global_brain.actor_critic, pop_up, window)
 
-        if losscount % SHOW_ITER == 0:
-            total_loss_sum1 /= SHOW_ITER
-            val_loss_sum1 /= SHOW_ITER
-            act_loss_sum1 /= SHOW_ITER
-            entropy_sum1 /= SHOW_ITER
+        if losscount%SHOW_ITER == 0:
+            total_loss_sum1 = total_loss_sum1 / SHOW_ITER
+            val_loss_sum1 = val_loss_sum1 / SHOW_ITER
+            act_loss_sum1 = act_loss_sum1 / SHOW_ITER
+            entropy_sum1 = entropy_sum1 / SHOW_ITER
             prob1_loss_sum1 /= SHOW_ITER
             advan_loss_sum1 /= SHOW_ITER
 
@@ -556,18 +358,17 @@ def train(args):
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
-            with torch.no_grad():
-                if losscount%200 == 0:
-                    for i in range(PLAY_WITH_MINIMAX):
-                        game = make_game(True, False, 'fair')
-                        game.main_loop(global_brain.actor_critic, pop_up)
+            if losscount%200 == 0:
+                for i in range(PLAY_WITH_MINIMAX):
+                    game = make_game(True, False, 'fair')
+                    game.main_loop(global_brain.actor_critic, pop_up)
 
-                        if game.winner == 1:
-                            p1_win += 1
-                        elif game.winner is None:
-                            game_draw += 1
+                    if game.winner == 1:
+                        p1_win += 1
+                    elif game.winner is None:
+                        game_draw += 1
 
-                    writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
+                writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
 
             p1_win = 0
             game_draw = 0
@@ -580,6 +381,7 @@ def train(args):
 
         rollouts1.after_update()
         rollouts2.after_update()
+
 
 def main():
     parser = argparse.ArgumentParser()

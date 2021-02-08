@@ -8,32 +8,51 @@ from tron.player import KeyboardPlayer,ACPlayer
 
 
 def pop_up(map):
-    my=np.zeros((map.shape[0],map.shape[1]))
-    ener=np.zeros((map.shape[0],map.shape[1]))
-    wall=np.zeros((map.shape[0],map.shape[1]))
+    my = np.zeros((map.shape[0],map.shape[1]))
+    enem = np.zeros((map.shape[0],map.shape[1]))
+    wall = np.zeros((map.shape[0],map.shape[1]))
+
+    find_my_head = False
+    find_enem_head = False
 
     for i in range(len(map[0])):
         for j in range(len(map[1])):
-            if(map[i][j]==-1):
+            if map[i][j] == -1:
                 wall[i][j]=1
-            elif (map[i][j] == -2):
+            elif map[i][j] == -2:
                 my[i][j] = 1
-            elif (map[i][j] == -3):
-                ener[i][j] = 1
-            elif (map[i][j] == -10):
-                ener[i][j] = 10
-            elif (map[i][j] == 10):
+            elif map[i][j] == -3:
+                enem[i][j] = 1
+            elif map[i][j] == -10:
+                enem[i][j] = 10
+                find_enem_head = True
+                head_i = i
+                head_j = j
+                if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
+                    wall[i][j] = 1
+            elif map[i][j] == 10:
                 my[i][j] = 10
+                find_my_head = True
+                head_i = i
+                head_j = j
+                if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
+                    wall[i][j] = 1
 
-    wall=wall.reshape(1,wall.shape[0],wall.shape[1])
-    ener = ener.reshape(1, ener.shape[0], ener.shape[1])
+    if not find_enem_head:
+        enem[head_i][head_j] = 10
+
+    if not find_my_head:
+        my[head_i][head_j] = 10
+
+    wall = wall.reshape(1,wall.shape[0],wall.shape[1])
+    enem = enem.reshape(1, enem.shape[0], enem.shape[1])
     my = my.reshape(1, my.shape[0], my.shape[1])
 
-    wall=torch.from_numpy(wall)
-    ener=torch.from_numpy(ener)
-    my=torch.from_numpy(my)
+    wall = torch.from_numpy(wall)
+    enem = torch.from_numpy(enem)
+    my = torch.from_numpy(my)
 
-    return np.concatenate((wall,my,ener),axis=0)
+    return np.concatenate((wall,my,enem),axis=0)
 
 def make_game(p1,p2,mode=None):
 
@@ -76,35 +95,7 @@ def make_game(p1,p2,mode=None):
     return game
 
 
-def get_reward(game, constants, sep=True, p1_len=0, p2_len=0):
-    if game.winner is None:
-        return 0, 0
-    elif game.winner == 1:
-        if not sep:
-            return constants[0], constants[1]
-        else:
-            return constants[2] + constants[3] * p1_len, constants[1]
-    else:
-        if not sep:
-            return constants[1], constants[0]
-        else:
-            return constants[1], constants[2] + constants[3] * p2_len
-
-    """
-    if p1_len > p2_len:
-        if sep:
-            return constants[2] + constants[3] * p1_len, constants[1]
-        else:
-            return constants[0], constants[1]
-    elif p2_len > p1_len:
-        if sep:
-            return constants[1], constants[2] + constants[3] * p2_len
-        else:
-            return constants[1], constants[0]
-    else:
-    """
-
-    """
+def get_reward(game, constants, winner_len=0, loser_len=0):
     if game.winner is None:
         return 0, 0
     elif game.winner == 1:
@@ -117,4 +108,3 @@ def get_reward(game, constants, sep=True, p1_len=0, p2_len=0):
             return constants[1], constants[0]
         else:
             return constants[1], constants[2] + constants[3]/loser_len
-    """

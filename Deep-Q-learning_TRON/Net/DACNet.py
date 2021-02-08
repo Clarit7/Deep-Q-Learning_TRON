@@ -8,66 +8,47 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, 3, padding=1)
+        # self.inception=Inception3().cuda()
+        self.conv1 = nn.Conv2d(3, 32, 5,padding=2)
 
-        self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
-        self.conv3 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, 5)
 
-        self.conv4 = nn.Conv2d(32, 64, 3, padding=1)
 
-        self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
-        self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
+        self.fc1 = nn.Linear(64*8*8, 2048)
+        self.fc2 = nn.Linear(2048, 1024)
+        self.fc3 = nn.Linear(1024, 256)
+        self.fc4 = nn.Linear(256, 128)
 
-        self.pool = nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
+        self.actor1 = nn.Linear(128, 64)
+        self.actor2 = nn.Linear(64, 4)
 
-        self.conv7 = nn.Conv2d(64, 64, 5, padding=2)
+        self.critic1 = nn.Linear(128, 64)
+        self.critic2 = nn.Linear(64, 32)
 
-        self.fc1 = nn.Linear(64 * 6 * 6, 1024)
-        self.fc2 = nn.Linear(1024, 512)
-
-        self.actor1 = nn.Linear(512, 256)
-        self.actor2 = nn.Linear(256, 64)
-        self.actor3 = nn.Linear(64, 4)
-
-        self.critic1 = nn.Linear(512, 256)
-        self.critic2 = nn.Linear(256, 128)
-        self.critic3 = nn.Linear(128, 32)
-
-        self.dropout = nn.Dropout(p=0.2)
+        self.dropout = nn.Dropout(p=0.4)
         self.activation = self.mish
 
+        # self.activation=torch.tanh
     def forward(self, x):
         '''신경망 순전파 계산을 정의'''
+
         x = x.to(device)
-
+        #
         x = self.activation(self.conv1(x))
-
-        idx = x
-
         x = self.activation(self.conv2(x))
-        x = self.activation(self.conv3(x) + idx)
+        # print(x.size())
+        # x = self.inception(x)
 
-        x = self.activation(self.conv4(x))
-
-        idx = x
-
-        x = self.activation(self.conv5(x))
-        x = self.activation(self.conv6(x) + idx)
-
-        x = self.pool(x)
-
-        x = self.activation(self.conv7(x))
-
-        x = x.view(-1, 64 * 6 * 6)
-
+        # print(x.size())
+        x = x.view(-1, 64*8*8)
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))
+        x = self.dropout(self.activation(self.fc3(x)))
+        x = self.dropout(self.activation(self.fc4(x)))
 
         actor_output = self.actor2(self.activation(self.actor1(x)))
-        actor_output = self.actor3(self.activation(actor_output))
 
         critic_output = self.critic2(self.activation(self.critic1(x)))
-        critic_output = self.critic3(self.activation(critic_output))
 
         return critic_output, actor_output
 
@@ -105,3 +86,134 @@ class Net(nn.Module):
 
     def mish(self, x):
         return x * torch.tanh(F.softplus(x))
+
+
+class Net2(Net):
+    def __init__(self):
+        super(Net, self).__init__()
+
+        self.conv1 = nn.Conv2d(3, 32, 5, stride=2, padding=3)
+        self.pool1 = nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
+
+        self.conv2 = nn.Conv2d(32, 32, 3,padding=1)
+        self.conv3 = nn.Conv2d(32, 32, 3,padding=1)
+
+        self.conv4 = nn.Conv2d(32, 64, 3, stride=2, padding=1)
+        self.projection = nn.Conv2d(32, 64, 1, stride=2)
+
+        self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
+        self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
+
+        self.pool2 = nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
+
+        self.fc1 = nn.Linear(64, 64)
+        self.fc2 = nn.Linear(64, 64)
+
+        self.actor1 = nn.Linear(64, 16)
+        self.actor2 = nn.Linear(16, 4)
+
+        self.critic1 = nn.Linear(64, 32)
+        self.critic2 = nn.Linear(32, 8)
+
+        self.dropout = nn.Dropout(p=0.2)
+        self.activation = self.mish
+
+        # self.activation=torch.tanh
+    def forward(self, x):
+        '''신경망 순전파 계산을 정의'''
+        x = x.to(device)
+
+        x = self.conv1(x)
+        x = self.pool1(x)
+
+        idx = x
+
+        x = self.activation(self.conv2(x))
+        x = self.activation(self.conv3(x)+idx)
+
+        idx = x
+
+        x = self.activation(self.conv4(idx))
+        idx = self.projection(idx)
+
+        x = self.activation(self.conv5(x))
+        x = self.activation(self.conv6(x) + idx)
+
+        x = self.pool2(x)
+
+        x = x.view(-1, 64)
+
+        x = self.dropout(self.activation(self.fc1(x)))
+        x = self.dropout(self.activation(self.fc2(x)))
+
+        actor_output = self.activation(self.actor1(x))
+        actor_output = self.actor2(actor_output)
+
+        critic_output = self.activation(self.critic1(x))
+        critic_output = self.critic2(critic_output)
+
+        return critic_output, actor_output
+
+
+class Net3(Net):
+    def __init__(self):
+        super(Net, self).__init__()
+
+        self.conv1 = nn.Conv2d(3, 32, 3,padding=1)
+
+        self.conv2 = nn.Conv2d(32, 32, 3,padding=1)
+        self.conv3 = nn.Conv2d(32, 32, 3,padding=1)
+
+        self.conv4 = nn.Conv2d(32, 64, 3, padding=1)
+
+        self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
+        self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
+
+        self.pool=nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
+
+        self.conv7=nn.Conv2d(64,64,7,padding=3, stride=2)
+
+        self.fc1 = nn.Linear(64*3*3, 256)
+        self.fc2 = nn.Linear(256, 128)
+
+        self.actor1 = nn.Linear(128, 64)
+        self.actor2 = nn.Linear(64, 4)
+
+        self.critic1 = nn.Linear(128, 128)
+        self.critic2 = nn.Linear(128, 64)
+
+        self.dropout = nn.Dropout(p=0.2)
+        self.activation = self.mish
+
+    def forward(self, x):
+        '''신경망 순전파 계산을 정의'''
+        x = x.to(device)
+
+        x = self.activation(self.conv1(x))
+
+        idx = x
+
+        x = self.activation(self.conv2(x))
+        x = self.activation(self.conv3(x)+idx)
+
+        x = self.activation(self.conv4(x))
+
+        idx = x
+
+        x = self.activation(self.conv5(x))
+        x = self.activation(self.conv6(x)+idx)
+
+        x = self.pool(x)
+
+        x = self.activation(self.conv7(x))
+
+        x = x.view(-1, 64*3*3)
+
+        x = self.dropout(self.activation(self.fc1(x)))
+        x = self.dropout(self.activation(self.fc2(x)))
+
+        actor_output = self.actor2(self.activation(self.actor1(x)))
+
+        critic_output = self.critic2(self.activation(self.critic1(x)))
+
+        return critic_output, actor_output
