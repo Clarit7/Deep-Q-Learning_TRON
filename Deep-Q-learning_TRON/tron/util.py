@@ -3,9 +3,9 @@ import random
 
 from config import *
 from tron.game import *
+from tron.static_game import StaticGame
 from tron.minimax import MinimaxPlayer
 from tron.player import KeyboardPlayer,ACPlayer
-
 
 def pop_up(map):
     my = np.zeros((map.shape[0],map.shape[1]))
@@ -92,6 +92,28 @@ def make_game(p1,p2,mode=None):
     game = Game(MAP_WIDTH, MAP_HEIGHT, [
         PositionPlayer(1,  ACPlayer() if p1 else MinimaxPlayer(2, "voronoi"), [x1, y1]),
         PositionPlayer(2,  ACPlayer() if p2 else MinimaxPlayer(2, "voronoi"), [x2, y2]), ])
+    return game
+
+
+def make_static_game(is_AC):
+    lower_bound_x, lower_bound_y = 0,0
+    upper_bound_x = MAP_WIDTH - 1
+    upper_bound_y = MAP_HEIGHT - 1
+
+    x = random.randint(lower_bound_x, upper_bound_x)
+    y = random.randint(lower_bound_y, upper_bound_y)
+
+    wall_num = random.randint(0, 3)
+
+    if wall_num == 0:
+        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [lower_bound_x, y])
+    elif wall_num == 1:
+        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [x, upper_bound_y])
+    elif wall_num == 2:
+        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [upper_bound_x, y])
+    else:
+        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [x, lower_bound_y])
+
     return game
 
 
