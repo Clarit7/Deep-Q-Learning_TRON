@@ -168,7 +168,6 @@ class Game:
         for id, pp in enumerate(self.pps):
             if type(pp.player) == type(ACPlayer()):
                 (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, action[id])
-
             else:
                 (pp.position, pp.player.direction) = pp.player.next_position_and_direction(pp.position, id + 1,self.map())
 
