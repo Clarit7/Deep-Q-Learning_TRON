@@ -10,9 +10,7 @@ class Net(nn.Module):
 
         # self.inception=Inception3().cuda()
         self.conv1 = nn.Conv2d(3, 32, 5,padding=2)
-
         self.conv2 = nn.Conv2d(32, 64, 5)
-
 
         self.fc1 = nn.Linear(64*8*8, 2048)
         self.fc2 = nn.Linear(2048, 1024)
@@ -162,21 +160,21 @@ class Net3(Net):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, 3,padding=1)
+        self.conv1 = nn.Conv2d(2, 16, 3,padding=1)
 
-        self.conv2 = nn.Conv2d(32, 32, 3,padding=1)
-        self.conv3 = nn.Conv2d(32, 32, 3,padding=1)
+        self.conv2 = nn.Conv2d(16, 16, 3,padding=1)
+        self.conv3 = nn.Conv2d(16, 16, 3,padding=1)
 
-        self.conv4 = nn.Conv2d(32, 64, 3, padding=1)
+        self.conv4 = nn.Conv2d(16, 32, 3, padding=1)
 
-        self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
-        self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
+        self.conv5 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv6 = nn.Conv2d(32, 32, 3, padding=1)
 
         self.pool=nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
 
-        self.conv7=nn.Conv2d(64,64,7,padding=3, stride=2)
+        self.conv7=nn.Conv2d(32,32,7,padding=3, stride=2)
 
-        self.fc1 = nn.Linear(64*3*3, 256)
+        self.fc1 = nn.Linear(32*3*3, 256)
         self.fc2 = nn.Linear(256, 128)
 
         self.actor1 = nn.Linear(128, 64)
@@ -211,7 +209,7 @@ class Net3(Net):
 
         x = self.activation(self.conv7(x))
 
-        x = x.view(-1, 64*3*3)
+        x = x.view(-1, 32*3*3)
 
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))

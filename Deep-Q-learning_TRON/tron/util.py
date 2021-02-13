@@ -54,6 +54,45 @@ def pop_up(map):
 
     return np.concatenate((wall,my,enem),axis=0)
 
+def pop_up_static(map):
+    my = np.zeros((map.shape[0],map.shape[1]))
+    enem = np.zeros((map.shape[0],map.shape[1]))
+    wall = np.zeros((map.shape[0],map.shape[1]))
+
+    find_my_head = False
+    find_enem_head = False
+
+    for i in range(len(map[0])):
+        for j in range(len(map[1])):
+            if map[i][j] == -1:
+                wall[i][j]=1
+            elif map[i][j] == -2:
+                my[i][j] = 1
+            elif map[i][j] == -3:
+                wall[i][j] = 1
+            elif map[i][j] == -10:
+                wall[i][j] = 10
+                find_enem_head = True
+                head_i = i
+                head_j = j
+                if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
+                    wall[i][j] = 1
+            elif map[i][j] == 10:
+                my[i][j] = 10
+                find_my_head = True
+                head_i = i
+                head_j = j
+                if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
+                    wall[i][j] = 1
+
+    wall = wall.reshape(1,wall.shape[0],wall.shape[1])
+    my = my.reshape(1, my.shape[0], my.shape[1])
+
+    wall = torch.from_numpy(wall)
+    my = torch.from_numpy(my)
+
+    return np.concatenate((wall,my),axis=0)
+
 def make_game(p1,p2,mode=None):
 
     if mode == "fair":
