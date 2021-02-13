@@ -56,11 +56,7 @@ def pop_up(map):
 
 def pop_up_static(map):
     my = np.zeros((map.shape[0],map.shape[1]))
-    enem = np.zeros((map.shape[0],map.shape[1]))
     wall = np.zeros((map.shape[0],map.shape[1]))
-
-    find_my_head = False
-    find_enem_head = False
 
     for i in range(len(map[0])):
         for j in range(len(map[1])):
@@ -68,20 +64,12 @@ def pop_up_static(map):
                 wall[i][j]=1
             elif map[i][j] == -2:
                 my[i][j] = 1
-            elif map[i][j] == -3:
+            elif map[i][j] == -3 or map[i][j] == -10:
                 wall[i][j] = 1
-            elif map[i][j] == -10:
-                wall[i][j] = 10
-                find_enem_head = True
-                head_i = i
-                head_j = j
                 if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
                     wall[i][j] = 1
             elif map[i][j] == 10:
                 my[i][j] = 10
-                find_my_head = True
-                head_i = i
-                head_j = j
                 if i == 0 or i == len(map[0]) - 1 or j == 0 or j == len(map[1]):
                     wall[i][j] = 1
 
@@ -134,7 +122,7 @@ def make_game(p1,p2,mode=None):
     return game
 
 
-def make_static_game(is_AC):
+def make_static_game(is_AC, map=None, head_init=None):
     lower_bound_x, lower_bound_y = 0,0
     upper_bound_x = MAP_WIDTH - 1
     upper_bound_y = MAP_HEIGHT - 1
@@ -145,13 +133,13 @@ def make_static_game(is_AC):
     wall_num = random.randint(0, 3)
 
     if wall_num == 0:
-        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [lower_bound_x, y])
+        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [lower_bound_x, y], map, head_init)
     elif wall_num == 1:
-        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [x, upper_bound_y])
+        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [x, upper_bound_y], map, head_init)
     elif wall_num == 2:
-        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [upper_bound_x, y])
+        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [upper_bound_x, y], map, head_init)
     else:
-        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [x, lower_bound_y])
+        game = StaticGame(is_AC, MAP_WIDTH, MAP_HEIGHT, [x, lower_bound_y], map, head_init)
 
     return game
 
@@ -169,3 +157,25 @@ def get_reward(game, constants, winner_len=0, loser_len=0):
             return constants[1], constants[0]
         else:
             return constants[1], constants[2] + constants[3]/loser_len
+
+
+def get_mask(game_map, x, y, mask):
+    mask[x, y] = 0
+
+    if game_map[x + 1, y] == 0:
+        game_map[x + 1, y] = 1
+        mask = get_mask(game_map, x + 1, y, mask)
+
+    if game_map[x - 1, y] == 0:
+        game_map[x - 1, y] = 1
+        mask = get_mask(game_map, x - 1, y, mask)
+
+    if game_map[x, y + 1] == 0:
+        game_map[x, y + 1] = 1
+        mask = get_mask(game_map, x, y + 1, mask)
+
+    if game_map[x, y - 1] == 0:
+        game_map[x, y - 1] = 1
+        mask = get_mask(game_map, x, y - 1, mask)
+
+    return mask

@@ -2,13 +2,13 @@ from Net.ACNet import *
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
+
 # from Net.DQNNet import Net as DQNNET
 
 from Net.kfac import KFACOptimizer
 from tron.util import *
 from tron.minimax import MinimaxPlayer
 from config import *
-from ACKTR_pretrain import Brain_static
 
 import argparse
 
@@ -26,7 +26,7 @@ class RolloutStorage(object):
     def __init__(self, num_steps, num_processes):
 
         # self.observations = torch.zeros(num_steps + 1, num_processes,3,12,12)
-        self.observations = torch.zeros(num_steps + 1, num_processes, 3, 12, 12)
+        self.observations = torch.zeros(num_steps + 1, num_processes, 2, 12, 12)
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
         self.rewards = torch.zeros(num_steps, num_processes, 1)
         self.actions = torch.zeros(num_steps, num_processes, 1).long()
@@ -61,7 +61,7 @@ class RolloutStorage(object):
             self.returns[ad_step] = self.returns[ad_step + 1] * GAMMA * self.masks[ad_step + 1] + self.rewards[ad_step]
 
 # 에이전트의 두뇌 역할을 하는 클래스. 모든 에이전트가 공유한다
-class Brain(object):
+class Brain_static(object):
     def __init__(self, actor_critic,args, acktr=False):
         self.actor_critic = actor_critic.to(device)  # actor_critic은 Net 클래스로 구현한 신경망
         #self.optimizer = optim.RMSprop(self.actor_critic.parameters(), lr=lr, eps=eps, alpha=alpha)
@@ -83,7 +83,7 @@ class Brain(object):
         num_processes = NUM_PROCESSES
 
         values, action_log_probs, entropy = self.actor_critic.evaluate_actions(
-            rollouts.observations[:-1].view(-1, 3, 12, 12).to(device).detach(),
+            rollouts.observations[:-1].view(-1, 2, 12, 12).to(device).detach(),
             rollouts.actions.view(-1, 1).to(device).detach())
 
         # 주의 : 각 변수의 크기
@@ -160,77 +160,55 @@ def train(args):
     game_draw = 0
 
     ai_p1=True
-    ai_p2=True
+
     p= "1" if args.p is None else args.p
     v = "1" if args.v is None else args.v
     m = "1" if args.m is None else args.m
     r = "1" if args.r is None else args.r
     unique= "" if args.u is None else args.u
 
-    envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
+    envs = [make_static_game(ai_p1) for i in range(NUM_PROCESSES)]
 
-    eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
+    eventid = datetime.now().strftime('runs/ACKTR_pretrain-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
         NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + unique + '-model ' + m + '-reward ' + r
 
     writer = SummaryWriter(eventid)
-
 
     if args.m == "2":
         actor_critic = Net2()  # 신경망 객체 생성
     elif args.m == "3":
         actor_critic = Net3()
     else:
-        actor_critic = Net()
+        actor_critic = Net3()
 
-    global_brain = Brain(actor_critic,args, acktr=False)
+    global_brain = Brain_static(actor_critic, args, acktr=True)
 
-    rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
-    episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
-    obs_np1 = np.zeros([NUM_PROCESSES,12,12])  # Numpy 배열 # 게임 상황이 12x12임
-    reward_np1 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
-    each_step1 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
-
-    rollouts2 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
-    episode_rewards2 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
-    obs_np2 = np.zeros([NUM_PROCESSES,12, 12])  # Numpy 배열 # 게임 상황이 12x12임
-    reward_np2 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
-    each_step2 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
+    rollouts = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
+    episode_rewards = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
+    obs_np = np.zeros([NUM_PROCESSES,12,12])  # Numpy 배열 # 게임 상황이 12x12임
+    reward_np = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
+    each_step = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
 
     done_np = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
 
     # 초기 상태로부터 시작
 
-    obs1 = [pop_up(envs[i].map().state_for_player(1)) for i in range(NUM_PROCESSES)]
+    obs = [pop_up_static(envs[i].map().state_for_player(1)) for i in range(NUM_PROCESSES)]
     # obs1 = [envs[i].map().state_for_player(1) for i in range(NUM_PROCESSES)]
-    obs1 = np.array(obs1)
-    obs1 = torch.from_numpy(obs1).float()  # torch.Size([32, 4])
+    obs = np.array(obs)
+    obs = torch.from_numpy(obs).float()  # torch.Size([32, 4])
 
-    p1_head = [torch.nonzero(obs1[i, 1] == 10).squeeze(0) for i in range(NUM_PROCESSES)]
-    obs1_uni = [obs1[i, 0] + obs1[i, 1] for i in range(NUM_PROCESSES)]
-    masking1 = [get_mask(obs1_uni[i], p1_head[i][0].item(), p1_head[i][1].item(), torch.ones((12, 12))) for i in range(NUM_PROCESSES)]
-
-    for i in range(NUM_PROCESSES):
-        obs1[i, 0] = masking1[i]
-
-    current_obs1 = obs1  # 가장 최근의 obs를 저장
-
-    obs2 = [pop_up(envs[i].map().state_for_player(2)) for i in range(NUM_PROCESSES)]
-    # obs2 = [envs[i].map().state_for_player(2) for i in range(NUM_PROCESSES)]
-    obs2 = np.array(obs2)
-    obs2 = torch.from_numpy(obs2).float()  # torch.Size([32, 4])
-
-    p2_head = [torch.nonzero(obs2[i, 1] == 10).squeeze(0) for i in range(NUM_PROCESSES)]
-    obs2_uni = [obs2[i, 0] + obs2[i, 1] for i in range(NUM_PROCESSES)]
-    masking2 = [get_mask(obs2_uni[i], p2_head[i][0].item(), p2_head[i][1].item(), torch.ones((12, 12))) for i in range(NUM_PROCESSES)]
+    player_head = [torch.nonzero(obs[i, 1] == 10).squeeze(0) for i in range(NUM_PROCESSES)]
+    obs_uni = [obs[i, 0] + obs[i, 1] for i in range(NUM_PROCESSES)]
+    masking = [get_mask(obs_uni[i], player_head[i][0].item(), player_head[i][1].item(), torch.ones((12, 12))) for i in range(NUM_PROCESSES)]
 
     for i in range(NUM_PROCESSES):
-        obs2[i, 0] = masking2[i]
+        obs[i, 0] = masking[i]
 
-    current_obs2 = obs2  # 가장 최근의 obs를 저장
+    current_obs = obs  # 가장 최근의 obs를 저장
 
     # advanced 학습에 사용되는 객체 rollouts 첫번째 상태에 현재 상태를 저장
-    rollouts1.observations[0].copy_(current_obs1)
-    rollouts2.observations[0].copy_(current_obs2)
+    rollouts.observations[0].copy_(current_obs)
     gamecount = 0
     losscount = 0
     duration = 0
@@ -242,108 +220,83 @@ def train(args):
     else:
         reward_constants = reward_cons1
 
-    ac_static = Net3()
-    static_brain = Brain(ac_static,args, acktr=True)
-    static_brain.actor_critic.load_state_dict(torch.load('./ACKTR_static_model.bak'))
-
     # 1 에피소드에 해당하는 반복문
     while True:  # 전체 for문
         # advanced 학습 대상이 되는 각 단계에 대해 계산
         for step in range(NUM_ADVANCED_STEP):
             # 행동을 선택
             with torch.no_grad():
-                action1 = actor_critic.act(rollouts1.observations[step])
-                action2 = actor_critic.act(rollouts2.observations[step])
+                action1 = actor_critic.act(rollouts.observations[step])
 
             # (32,1)→(32,) -> tensor를 NumPy변수로
             actions1 = action1.squeeze(1).to('cpu').numpy()
-            actions2 = action2.squeeze(1).to('cpu').numpy()
 
             # 한 단계를 실행
             for i in range(NUM_PROCESSES):
-                act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
-                act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
+                act = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len = envs[i].step(act1, act2, masking1[i], masking2[i], static_brain.actor_critic)
+                obs_np[i], done_np[i] = envs[i].step(act)
 
-                each_step1[i] += 1
-                each_step2[i] += 1
+                each_step[i] += 1
 
                 if done_np[i]:
-                    reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
-
+                    reward_np[i] = 0
                     if i == 0:
                         gamecount += 1
-                        duration += each_step1[i]+loser_len
+                        duration += each_step[i]
 
                         if gamecount % SHOW_ITER == 0:
-                            print('%d Episode: Finished after %d steps' % (gamecount, each_step1[i]))
+                            print('%d Episode: Finished after %d steps' % (gamecount, each_step[i]))
                             writer.add_scalar('Duration', duration/SHOW_ITER, gamecount)
                             duration = 0
 
-                    envs[i] = make_game(ai_p1,ai_p2)
+                    envs[i] = make_static_game(ai_p1)
 
-                    obs_np1[i] = envs[i].map().state_for_player(1)
-                    obs_np2[i] = envs[i].map().state_for_player(2)
-                    each_step1[i] = 0
-                    each_step2[i] = 0
+                    obs_np[i] = envs[i].map().state_for_player(1)
+                    each_step[i] = 0
                 else:
-                    reward_np1[i] = -1  # 그 외의 경우는 보상 0 부여
-                    reward_np2[i] = -1
+                    reward_np[i] = 4  # 그 외의 경우는 보상 0 부여
 
             # 보상을 tensor로 변환하고, 에피소드의 총보상에 더해줌
-            reward1 = torch.from_numpy(reward_np1).float()
-            episode_rewards1 += reward1
-
-            reward2 = torch.from_numpy(reward_np2).float()
-            episode_rewards2 += reward2
+            reward = torch.from_numpy(reward_np).float()
+            episode_rewards += reward
 
             # 각 실행 환경을 확인하여 done이 true이면 mask를 0으로, false이면 mask를 1로
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done_np])
 
             # current_obs를 업데이트
-            obs1 = [pop_up(obs_np1[i]) for i in range(NUM_PROCESSES)]
-            obs2 = [pop_up(obs_np2[i]) for i in range(NUM_PROCESSES)]
-
-            obs1 = torch.tensor(np.array(obs1))
-            obs2 = torch.tensor(np.array(obs2))
+            obs = [pop_up_static(obs_np[i]) for i in range(NUM_PROCESSES)]
+            obs = torch.tensor(np.array(obs))
 
             for i in range(NUM_PROCESSES):
-                if done_np[i]:
-                    p1_head[i] = torch.nonzero(obs1[i, 1] == 10).squeeze(0)
-                    obs1_uni[i] = obs1[i, 0] + obs1[i, 1]
-                    masking1[i] = get_mask(obs1_uni[i], p1_head[i][0].item(), p1_head[i][1].item(), torch.ones((12, 12)))
+                player_head[i] = torch.nonzero(obs[i, 1] == 10).squeeze(0) if done_np[i] else player_head[i]
+                obs_uni[i] = obs[i, 0] + obs[i, 1] if done_np[i] else obs_uni[i]
+                masking[i] = get_mask(obs_uni[i], player_head[i][0].item(), player_head[i][1].item(), torch.ones((12, 12))) if done_np[i] else masking[i]
 
-                    p2_head[i] = torch.nonzero(obs2[i, 1] == 10).squeeze(0)
-                    obs2_uni[i] = obs2[i, 0] + obs2[i, 1]
-                    masking2[i] = get_mask(obs2_uni[i], p2_head[i][0].item(), p2_head[i][1].item(), torch.ones((12, 12)))
+            for i in range(NUM_PROCESSES):
+                obs[i, 0] = masking[i] if done_np[i] else masking[i]
 
-            current_obs1 = obs1  # 최신 상태의 obs를 저장
-            current_obs2 = obs2  # 최신 상태의 obs를 저장
+            current_obs = obs  # 최신 상태의 obs를 저장
 
             # 메모리 객체에 현 단계의 transition을 저장
-            rollouts1.insert(current_obs1, action1.data, reward1, masks)
-            rollouts2.insert(current_obs2, action2.data, reward2, masks)
+            rollouts.insert(current_obs, action1.data, reward, masks)
 
         # advanced 학습 for문 끝
 
         # advanced 학습 대상 중 마지막 단계의 상태로 예측하는 상태가치를 계산
 
         with torch.no_grad():
-            next_value1 = actor_critic.get_value(rollouts1.observations[-1])
-            next_value2 = actor_critic.get_value(rollouts2.observations[-1])
+            next_value1 = actor_critic.get_value(rollouts.observations[-1])
             # rollouts.observations의 크기는 torch.Size([6, 32, 4])
 
         # 모든 단계의 할인총보상을 계산하고, rollouts의 변수 returns를 업데이트
-        rollouts1.compute_returns(next_value1)
-        rollouts2.compute_returns(next_value2)
+        rollouts.compute_returns(next_value1)
 
         # 신경망 및 rollout 업데이트
-        loss1, val1, act1, entro1, prob1, advan1 = global_brain.update(rollouts1)
-        global_brain.update(rollouts2)
+        loss1, val1, act, entro1, prob1, advan1 = global_brain.update(rollouts)
         losscount += 1
 
-        act_loss_sum1 += act1
+        act_loss_sum1 += act
         entropy_sum1 += entro1
         val_loss_sum1 += val1
         total_loss_sum1 += loss1
@@ -382,20 +335,6 @@ def train(args):
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
-            if losscount%200 == 0:
-                for i in range(PLAY_WITH_MINIMAX):
-                    game = make_game(True, False, 'fair')
-                    game.main_loop(global_brain.actor_critic, pop_up)
-
-                    if game.winner == 1:
-                        p1_win += 1
-                    elif game.winner is None:
-                        game_draw += 1
-
-                writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
-
-            p1_win = 0
-            game_draw = 0
             act_loss_sum1 = 0
             entropy_sum1 = 0
             val_loss_sum1 = 0
@@ -403,8 +342,7 @@ def train(args):
             prob1_loss_sum1 = 0
             advan_loss_sum1 = 0
 
-        rollouts1.after_update()
-        rollouts2.after_update()
+        rollouts.after_update()
 
 
 def main():

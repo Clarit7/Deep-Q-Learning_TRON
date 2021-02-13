@@ -1,14 +1,13 @@
 from time import sleep
 from enum import Enum
+from orderedset import OrderedSet
 
 from tron.map import Map, Tile
 from tron.player import ACPlayer
-from orderedset import OrderedSet
 
 import torch
 import numpy as np
 import queue
-
 
 class SetQueue(queue.Queue):
     def _init(self, maxsize):
@@ -60,8 +59,8 @@ class Game:
 
         self.width = width
         self.height = height
-        mmap = Map(width, height, Tile.EMPTY, Tile.WALL)
-        self.history = [HistoryElement(mmap, None, None)]
+        self.mmap = Map(width, height, Tile.EMPTY, Tile.WALL)
+        self.history = [HistoryElement(self.mmap, None, None)]
         self.pps = pps
         self.winner = None
         self.loser_len=0
@@ -127,6 +126,17 @@ class Game:
         else:
             return 0
 
+    def get_longest_path_masking(self, static_brain):
+        p1_len = self.get_length_masking(1, static_brain)
+        p2_len = self.get_length_masking(2, static_brain)
+
+        if p1_len > p2_len:
+            return 1
+        elif p2_len > p1_len:
+            return 2
+        else:
+            return 0
+
     def get_length(self, map_clone, x, y, length, prev_length):
 
         map_clone[x, y] = 5
@@ -156,7 +166,38 @@ class Game:
 
         return max(l1, l2, l3, l4)
 
-    def next_frame(self, action_p1, action_p2, window=None):
+    def get_length_masking(self, player_num, static_brain):
+        from tron.util import pop_up_static, make_static_game, get_mask
+
+        obs_np = self.map().state_for_player(player_num)
+        obs = pop_up_static(obs_np)
+        obs = torch.tensor(np.array(obs)).float()
+
+        player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+
+        static_env = make_static_game(True, self.map(), player_head)
+
+        obs_uni = obs[0] + obs[1]
+        masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(), torch.ones((12, 12)))
+        obs[0] = masking
+
+        duration = 0
+        done = 0
+
+        while done == 0:
+            duration += 1
+            act = static_brain.act(obs.unsqueeze(0))
+
+            obs_np, done = static_env.step(act)
+            obs = pop_up_static(obs_np)
+            obs = torch.tensor(np.array(obs)).float()
+            obs[0] = masking
+
+        print('static_duration :', duration)
+
+        return duration
+
+    def next_frame(self, action_p1, action_p2, window=None, masking1=None, masking2=None, static_brain=None):
 
         map_clone = self.map()
 
@@ -186,8 +227,16 @@ class Game:
             else:
                 map_clone[pp.position[0], pp.position[1]] = pp.head()
 
+        self.history.append(HistoryElement(map_clone, None, None))
+        self.next_p1 = self.history[-1].map.state_for_player(1)
+        self.next_p2 = self.history[-1].map.state_for_player(2)
+
         if not done and self.check_separated(map_clone, self.pps[0]):
-            winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+            if masking1 is None:
+                winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])  # To do : combine with pretrain model
+            else:
+                winner = self.get_longest_path_masking(static_brain)  # To do : combine with pretrain model
+
             if winner == 1:
                 self.pps[1].alive = False
             elif winner == 2:
@@ -195,10 +244,6 @@ class Game:
             else:
                 self.pps[0].alive = False
                 self.pps[1].alive = False
-
-        self.history.append(HistoryElement(map_clone, None, None))
-        self.next_p1 = self.history[-1].map.state_for_player(1)
-        self.next_p2 = self.history[-1].map.state_for_player(2)
 
         if window:
             import pygame
@@ -220,13 +265,12 @@ class Game:
 
         return True
 
-    def step(self, action_p1, action_p2):
-
+    def step(self, action_p1, action_p2, masking1=None, masking2=None, static_brain=None):
         alive_count = 0
         alive = None
         self.reword = 10
 
-        if not self.next_frame(action_p1, action_p2):
+        if not self.next_frame(action_p1, action_p2, masking1=masking1, masking2=masking2, static_brain=static_brain):
             self.done = True
 
             return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len
