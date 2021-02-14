@@ -111,6 +111,7 @@ class Game:
         p1_length = self.get_length(np.copy(map_clone.state_for_player(1)), p1.position[0] + 1, p1.position[1] + 1, 0, None)
         p2_length = self.get_length(np.copy(map_clone.state_for_player(2)), p2.position[0] + 1, p2.position[1] + 1, 0, None)
 
+        print('p1lenght p2length', p1_length, p2_length)
         # if p2_length == -10 or p1_length < p2_length:
         if p1_length < p2_length:
             self.loser_len=p1_length
@@ -197,7 +198,7 @@ class Game:
 
         return duration
 
-    def next_frame(self, action_p1, action_p2, window=None, masking1=None, masking2=None, static_brain=None):
+    def next_frame(self, action_p1, action_p2, window=None, static_brain=None):
 
         map_clone = self.map()
 
@@ -232,7 +233,7 @@ class Game:
         self.next_p2 = self.history[-1].map.state_for_player(2)
 
         if not done and self.check_separated(map_clone, self.pps[0]):
-            if masking1 is None:
+            if static_brain is None:
                 winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])  # To do : combine with pretrain model
             else:
                 winner = self.get_longest_path_masking(static_brain)  # To do : combine with pretrain model
@@ -265,14 +266,15 @@ class Game:
 
         return True
 
-    def step(self, action_p1, action_p2, masking1=None, masking2=None, static_brain=None):
+    def step(self, action_p1, action_p2, static_brain=None):
         alive_count = 0
         alive = None
         self.reword = 10
 
-        if not self.next_frame(action_p1, action_p2, masking1=masking1, masking2=masking2, static_brain=static_brain):
+        if not self.next_frame(action_p1, action_p2, static_brain=static_brain):
             self.done = True
 
+            print("is not next frame")
             return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len
 
         for pp in self.pps:

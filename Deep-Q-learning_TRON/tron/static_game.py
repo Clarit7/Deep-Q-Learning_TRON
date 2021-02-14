@@ -61,7 +61,7 @@ class StaticGame:
             self.history = [HistoryElement(self.mmap, None, None)]
             self.history[-1].map[self.pp.position[0], self.pp.position[1]] = self.pp.head()
         else:
-            head_init = [head_init[0].item(), head_init[1].item()]
+            head_init = [head_init[0].item() - 1, head_init[1].item() - 1]
             self.pp = PositionPlayer(ACPlayer() if is_AC else MinimaxPlayer(2, "voronoi"), head_init)
             self.history = [HistoryElement(map_init, None, None)]
 

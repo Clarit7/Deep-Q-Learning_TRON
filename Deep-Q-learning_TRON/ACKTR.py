@@ -176,13 +176,13 @@ def train(args):
 
 
     if args.m == "2":
-        actor_critic = Net2()  # 신경망 객체 생성
+        actor_critic = Net()  # 신경망 객체 생성
     elif args.m == "3":
-        actor_critic = Net3()
+        actor_critic = Net()
     else:
         actor_critic = Net()
 
-    global_brain = Brain(actor_critic,args, acktr=False)
+    global_brain = Brain(actor_critic,args, acktr=True)
 
     rollouts1 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards1 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
@@ -264,7 +264,7 @@ def train(args):
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len = envs[i].step(act1, act2, masking1[i], masking2[i], static_brain.actor_critic)
+                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len = envs[i].step(act1, act2, static_brain.actor_critic)
 
                 each_step1[i] += 1
                 each_step2[i] += 1

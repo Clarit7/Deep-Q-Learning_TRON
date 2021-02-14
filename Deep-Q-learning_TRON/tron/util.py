@@ -151,11 +151,13 @@ def get_reward(game, constants, winner_len=0, loser_len=0):
         if loser_len == 0 and winner_len == 0:
             return constants[0], constants[1]
         else:
+            print("sep")
             return constants[2] + constants[3]/loser_len, constants[1]
     else:
         if loser_len == 0:
             return constants[1], constants[0]
         else:
+            print("sep")
             return constants[1], constants[2] + constants[3]/loser_len
 
 
