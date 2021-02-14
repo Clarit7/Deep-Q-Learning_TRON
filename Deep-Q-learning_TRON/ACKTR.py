@@ -205,26 +205,12 @@ def train(args):
     obs1 = np.array(obs1)
     obs1 = torch.from_numpy(obs1).float()  # torch.Size([32, 4])
 
-    p1_head = [torch.nonzero(obs1[i, 1] == 10).squeeze(0) for i in range(NUM_PROCESSES)]
-    obs1_uni = [obs1[i, 0] + obs1[i, 1] for i in range(NUM_PROCESSES)]
-    masking1 = [get_mask(obs1_uni[i], p1_head[i][0].item(), p1_head[i][1].item(), torch.ones((12, 12))) for i in range(NUM_PROCESSES)]
-
-    for i in range(NUM_PROCESSES):
-        obs1[i, 0] = masking1[i]
-
     current_obs1 = obs1  # 가장 최근의 obs를 저장
 
     obs2 = [pop_up(envs[i].map().state_for_player(2)) for i in range(NUM_PROCESSES)]
     # obs2 = [envs[i].map().state_for_player(2) for i in range(NUM_PROCESSES)]
     obs2 = np.array(obs2)
     obs2 = torch.from_numpy(obs2).float()  # torch.Size([32, 4])
-
-    p2_head = [torch.nonzero(obs2[i, 1] == 10).squeeze(0) for i in range(NUM_PROCESSES)]
-    obs2_uni = [obs2[i, 0] + obs2[i, 1] for i in range(NUM_PROCESSES)]
-    masking2 = [get_mask(obs2_uni[i], p2_head[i][0].item(), p2_head[i][1].item(), torch.ones((12, 12))) for i in range(NUM_PROCESSES)]
-
-    for i in range(NUM_PROCESSES):
-        obs2[i, 0] = masking2[i]
 
     current_obs2 = obs2  # 가장 최근의 obs를 저장
 
@@ -307,16 +293,6 @@ def train(args):
 
             obs1 = torch.tensor(np.array(obs1))
             obs2 = torch.tensor(np.array(obs2))
-
-            for i in range(NUM_PROCESSES):
-                if done_np[i]:
-                    p1_head[i] = torch.nonzero(obs1[i, 1] == 10).squeeze(0)
-                    obs1_uni[i] = obs1[i, 0] + obs1[i, 1]
-                    masking1[i] = get_mask(obs1_uni[i], p1_head[i][0].item(), p1_head[i][1].item(), torch.ones((12, 12)))
-
-                    p2_head[i] = torch.nonzero(obs2[i, 1] == 10).squeeze(0)
-                    obs2_uni[i] = obs2[i, 0] + obs2[i, 1]
-                    masking2[i] = get_mask(obs2_uni[i], p2_head[i][0].item(), p2_head[i][1].item(), torch.ones((12, 12)))
 
             current_obs1 = obs1  # 최신 상태의 obs를 저장
             current_obs2 = obs2  # 최신 상태의 obs를 저장

@@ -111,7 +111,6 @@ class Game:
         p1_length = self.get_length(np.copy(map_clone.state_for_player(1)), p1.position[0] + 1, p1.position[1] + 1, 0, None)
         p2_length = self.get_length(np.copy(map_clone.state_for_player(2)), p2.position[0] + 1, p2.position[1] + 1, 0, None)
 
-        print('p1lenght p2length', p1_length, p2_length)
         # if p2_length == -10 or p1_length < p2_length:
         if p1_length < p2_length:
             self.loser_len=p1_length
@@ -180,6 +179,7 @@ class Game:
 
         obs_uni = obs[0] + obs[1]
         masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(), torch.ones((12, 12)))
+        masking = torch.where(obs[1] != 0, torch.zeros(1), masking)
         obs[0] = masking
 
         duration = 0
@@ -193,8 +193,6 @@ class Game:
             obs = pop_up_static(obs_np)
             obs = torch.tensor(np.array(obs)).float()
             obs[0] = masking
-
-        print('static_duration :', duration)
 
         return duration
 
