@@ -73,8 +73,8 @@ class Game:
         for pp in self.pps:
             self.history[-1].map[pp.position[0], pp.position[1]] = pp.head()
 
-    def map(self):
-        return self.history[-1].map.clone()
+    def map(self, invert=False):
+        return self.history[-1].map.clone(invert)
 
     def check_separated(self, map_clone, p1):
         path_queue = SetQueue()
@@ -175,7 +175,10 @@ class Game:
 
         player_head = torch.nonzero(obs[1] == 10).squeeze(0)
 
-        static_env = make_static_game(True, self.map(), player_head)
+        if player_num == 1:
+            static_env = make_static_game(True, self.map(invert=False), player_head)
+        else:
+            static_env = make_static_game(True, self.map(invert=True), player_head)
 
         obs_uni = obs[0] + obs[1]
         masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(), torch.ones((12, 12)))
@@ -187,7 +190,8 @@ class Game:
 
         while done == 0:
             duration += 1
-            act = static_brain.act(obs.unsqueeze(0))
+            with torch.no_grad():
+                act = static_brain.act(obs.unsqueeze(0))
 
             obs_np, done = static_env.step(act)
             obs = pop_up_static(obs_np)
@@ -232,9 +236,9 @@ class Game:
 
         if not done and self.check_separated(map_clone, self.pps[0]):
             if static_brain is None:
-                winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])  # To do : combine with pretrain model
+                winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             else:
-                winner = self.get_longest_path_masking(static_brain)  # To do : combine with pretrain model
+                winner = self.get_longest_path_masking(static_brain)
 
             if winner == 1:
                 self.pps[1].alive = False

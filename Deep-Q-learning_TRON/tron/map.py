@@ -13,6 +13,8 @@ class Tile(Enum):
     PLAYER_ONE_HEAD = 2
     PLAYER_TWO_BODY = 3
     PLAYER_TWO_HEAD = 4
+    TEMP_HEAD = 6
+    TEMP_BODY = 7
 
     def color(self):
         if self == Tile.EMPTY:
@@ -37,9 +39,18 @@ class Map:
         self.height = h
         self._data = np.array([[wall if is_on_border(i, j, w + 2, h + 2) else empty for i in range(h + 2)] for j in range(w + 2)])
 
-    def clone(self):
+    def clone(self, invert=False):
         clone = Map(self.width, self.height, 0, 0)
         clone._data = np.copy(self._data)
+
+        if invert:
+            clone._data[np.where(clone._data == Tile.PLAYER_TWO_HEAD)] = Tile.TEMP_HEAD
+            clone._data[np.where(clone._data == Tile.PLAYER_TWO_BODY)] = Tile.TEMP_BODY
+            clone._data[np.where(clone._data == Tile.PLAYER_ONE_HEAD)] = Tile.PLAYER_TWO_HEAD
+            clone._data[np.where(clone._data == Tile.PLAYER_ONE_BODY)] = Tile.PLAYER_TWO_BODY
+            clone._data[np.where(clone._data == Tile.TEMP_HEAD)] = Tile.PLAYER_ONE_HEAD
+            clone._data[np.where(clone._data == Tile.TEMP_BODY)] = Tile.PLAYER_ONE_BODY
+
         return clone
 
     def apply(self, converter):
