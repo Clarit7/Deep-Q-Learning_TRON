@@ -222,7 +222,7 @@ class StaticGame:
 
         return max(l1, l2, l3, l4)
 
-    def next_frame(self, action, window=None):
+    def next_frame(self, action, window=None, is_area=False):
 
         map_clone = self.map()
 
@@ -230,6 +230,8 @@ class StaticGame:
 
         if type(self.pp.player) == type(ACPlayer()):
             (self.pp.position, self.pp.player.direction) = self.pp.player.next_position_and_direction(self.pp.position, action)
+        elif is_area:
+            (self.pp.position, self.pp.player.direction) = self.pp.player.next_position_and_direction(self.pp.position, None, None, static_action=action)
         else:
             (self.pp.position, self.pp.player.direction) = self.pp.player.next_position_and_direction(self.pp.position, self.map())
 
@@ -263,9 +265,9 @@ class StaticGame:
 
         return True
 
-    def step(self, action):
+    def step(self, action, is_area=False):
 
-        if not self.next_frame(action):
+        if not self.next_frame(action, is_area=is_area):
             self.done = True
 
         if not self.pp.alive:

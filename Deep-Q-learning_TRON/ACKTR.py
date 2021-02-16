@@ -161,13 +161,14 @@ def train(args):
 
     ai_p1=True
     ai_p2=True
-    p= "1" if args.p is None else args.p
+    end_separated = True if args.end_separated is None else args.end_separated
+    p = "1" if args.p is None else args.p
     v = "1" if args.v is None else args.v
     m = "1" if args.m is None else args.m
     r = "1" if args.r is None else args.r
     unique= "" if args.u is None else args.u
 
-    envs = [make_game(ai_p1,ai_p2) for i in range(NUM_PROCESSES)]
+    envs = [make_game(ai_p1, ai_p2) for i in range(NUM_PROCESSES)]
 
     eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
         NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + unique + '-model ' + m + '-reward ' + r
@@ -189,12 +190,16 @@ def train(args):
     obs_np1 = np.zeros([NUM_PROCESSES,12,12])  # Numpy 배열 # 게임 상황이 12x12임
     reward_np1 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
     each_step1 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
+    p1_len_sum = 0
+    p1_exact_sum = 0
 
     rollouts2 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards2 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
     obs_np2 = np.zeros([NUM_PROCESSES,12, 12])  # Numpy 배열 # 게임 상황이 12x12임
     reward_np2 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
     each_step2 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
+    p2_len_sum = 0
+    p2_exact_sum = 0
 
     done_np = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
 
@@ -250,17 +255,22 @@ def train(args):
                 act1 = actions1[i] if ai_p1 else minimax.action(envs[i].map(), 1)
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
-                obs_np1[i], reward_np1[i], obs_np2[i], reward_np2[i], done_np[i],loser_len,winner_len = envs[i].step(act1, act2, static_brain.actor_critic)
+                obs_np1[i], obs_np2[i], done_np[i], p1_len, p1_exact, sep = \
+                    envs[i].step(act1, act2, static_brain.actor_critic, end_separated)
 
                 each_step1[i] += 1
                 each_step2[i] += 1
 
                 if done_np[i]:
-                    reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants, winner_len, loser_len)
+                    reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants)
+                    if sep:
+                        print(p1_len, p1_exact)
+                        p1_len_sum += p1_len
+                        p1_exact_sum += p1_exact
 
                     if i == 0:
                         gamecount += 1
-                        duration += each_step1[i]+loser_len
+                        duration += each_step1[i]
 
                         if gamecount % SHOW_ITER == 0:
                             print('%d Episode: Finished after %d steps' % (gamecount, each_step1[i]))
@@ -351,17 +361,23 @@ def train(args):
             torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'ACKTR_player'+m + unique +'.bak')
             # torch.save(global_brain2.actor_critic.state_dict(), 'ais/a3c/' + 'player_2.bak')
 
+            if p1_exact_sum == 0:
+                approx_percentage = 0
+            else:
+                approx_percentage = p1_len_sum / p1_exact_sum
+
             writer.add_scalar('Training loss', total_loss_sum1, losscount)
             writer.add_scalar('Value loss', val_loss_sum1, losscount)
             writer.add_scalar('Action gain', act_loss_sum1, losscount)
             writer.add_scalar('Entropy loss', entropy_sum1, losscount)
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
+            writer.add_scalar('approx_len / exact_len', approx_percentage, losscount)
 
             if losscount%200 == 0:
                 for i in range(PLAY_WITH_MINIMAX):
                     game = make_game(True, False, 'fair')
-                    game.main_loop(global_brain.actor_critic, pop_up)
+                    game.main_loop(global_brain.actor_critic, pop_up, static_brain=static_brain.actor_critic, end_separated=end_separated, vs_minimax=True)
 
                     if game.winner == 1:
                         p1_win += 1
@@ -378,6 +394,8 @@ def train(args):
             total_loss_sum1 = 0
             prob1_loss_sum1 = 0
             advan_loss_sum1 = 0
+            p1_len_sum = 0
+            p1_exact_sum = 0
 
         rollouts1.after_update()
         rollouts2.after_update()
@@ -386,6 +404,7 @@ def train(args):
 def main():
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('--end_separated', required=False, help='True if end condition is separated')
     parser.add_argument('-m', required=False, help='model structure number')
     parser.add_argument('-r', required=False, help='reward condition number')
 

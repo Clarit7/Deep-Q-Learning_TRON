@@ -293,10 +293,13 @@ class MinimaxPlayer(Player):
     def initialize_minimax(self):
         self.minimax = Minimax(self.depth, self.mode)
 
-    def action(self, map, id):
-        self.initialize_minimax()
-        game_map = map.state_for_player(id).T
-        next_action = self.minimax.get_move(game_map)
+    def action(self, map, id, static_action=None):
+        if static_action is None:
+            self.initialize_minimax()
+            game_map = map.state_for_player(id).T
+            next_action = self.minimax.get_move(game_map)
+        else:
+            next_action = static_action
 
         if next_action == 1:
             next_direction = Direction.UP
@@ -309,9 +312,9 @@ class MinimaxPlayer(Player):
 
         return next_direction
 
-    def next_position_and_direction(self, current_position,id,map):
+    def next_position_and_direction(self, current_position,id,map, static_action=None):
 
-        direction = self.action(map,id)
+        direction = self.action(map,id, static_action)
         return self.next_position(current_position, direction), direction
 
     def next_position(self, current_position, direction):

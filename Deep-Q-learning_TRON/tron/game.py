@@ -109,52 +109,57 @@ class Game:
 
     def get_longest_path(self, map_clone, p1, p2):
         p1_length = self.get_length(np.copy(map_clone.state_for_player(1)), p1.position[0] + 1, p1.position[1] + 1, 0, None)
+        """
         p2_length = self.get_length(np.copy(map_clone.state_for_player(2)), p2.position[0] + 1, p2.position[1] + 1, 0, None)
 
         # if p2_length == -10 or p1_length < p2_length:
         if p1_length < p2_length:
             self.loser_len=p1_length
             self.winner_len=p2_length
-            return 2
+            return 2, p1_length, p2_length
 
         elif p1_length > p2_length:
 
             self.loser_len=p2_length
             self.winner_len=p1_length
 
-            return 1
+            return 1, p1_length, p2_length
         else:
-            return 0
+            return 0, p1_length, p2_length
+        """
 
-    def get_longest_path_masking(self, static_brain):
+        return 0, p1_length-1
+
+    def get_longest_path_masking(self, static_brain, vs_minimax):
         p1_len = self.get_length_masking(1, static_brain)
-        p2_len = self.get_length_masking(2, static_brain)
+        p2_len = self.get_length_masking(2, None if vs_minimax else static_brain)
 
         if p1_len > p2_len:
-            return 1
+            return 1, p1_len
         elif p2_len > p1_len:
-            return 2
+            return 2, p1_len
         else:
-            return 0
+            return 0, p1_len
 
     def get_length(self, map_clone, x, y, length, prev_length):
-
+        length += 1
         map_clone[x, y] = 5
+
         l1, l2, l3, l4 = -1, -1, -1, -1
         if map_clone[x, y - 1] == 1:
-            l1 = self.get_length(map_clone, x, y - 1, length + 1, prev_length)
+            l1 = self.get_length(map_clone.copy(), x, y - 1, length, prev_length)
             if l1 == -10:
                 return -10
         if map_clone[x + 1, y] == 1:
-            l2 = self.get_length(map_clone, x + 1, y, length + 1, prev_length)
+            l2 = self.get_length(map_clone.copy(), x + 1, y, length, prev_length)
             if l2 == -10:
                 return -10
         if map_clone[x, y + 1] == 1:
-            l3 = self.get_length(map_clone, x, y + 1, length + 1, prev_length)
+            l3 = self.get_length(map_clone.copy(), x, y + 1, length, prev_length)
             if l3 == -10:
                 return -10
         if map_clone[x - 1, y] == 1:
-            l4 = self.get_length(map_clone, x - 1, y, length + 1, prev_length)
+            l4 = self.get_length(map_clone.copy(), x - 1, y, length, prev_length)
             if l4 == -10:
                 return -10
 
@@ -167,7 +172,7 @@ class Game:
         return max(l1, l2, l3, l4)
 
     def get_length_masking(self, player_num, static_brain):
-        from tron.util import pop_up_static, make_static_game, get_mask
+        from tron.util import pop_up_static, make_static_game, get_mask, get_direction_area
 
         obs_np = self.map().state_for_player(player_num)
         obs = pop_up_static(obs_np)
@@ -176,9 +181,9 @@ class Game:
         player_head = torch.nonzero(obs[1] == 10).squeeze(0)
 
         if player_num == 1:
-            static_env = make_static_game(True, self.map(invert=False), player_head)
+            static_env = make_static_game(static_brain is not None, self.map(invert=False), player_head)
         else:
-            static_env = make_static_game(True, self.map(invert=True), player_head)
+            static_env = make_static_game(static_brain is not None, self.map(invert=True), player_head)
 
         obs_uni = obs[0] + obs[1]
         masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(), torch.ones((12, 12)))
@@ -190,17 +195,22 @@ class Game:
 
         while done == 0:
             duration += 1
-            with torch.no_grad():
-                act = static_brain.act(obs.unsqueeze(0))
+            if static_brain is not None:
+                with torch.no_grad():
+                    act = static_brain.act(obs.unsqueeze(0))
+            else:
+                obs_uni = obs[0] + obs[1]
+                player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+                act = get_direction_area(obs_uni, player_head[0].item(), player_head[1].item())
 
-            obs_np, done = static_env.step(act)
+            obs_np, done = static_env.step(act, is_area=True)
             obs = pop_up_static(obs_np)
             obs = torch.tensor(np.array(obs)).float()
             obs[0] = masking
 
-        return duration
+        return duration - 1
 
-    def next_frame(self, action_p1, action_p2, window=None, static_brain=None):
+    def next_frame(self, action_p1, action_p2, window=None, static_brain=None, end_separated=False, vs_minimax=False):
 
         map_clone = self.map()
 
@@ -234,11 +244,18 @@ class Game:
         self.next_p1 = self.history[-1].map.state_for_player(1)
         self.next_p2 = self.history[-1].map.state_for_player(2)
 
-        if not done and self.check_separated(map_clone, self.pps[0]):
+        p1_length = 0
+        p1_exact = 0
+
+        sep = False
+        if end_separated and not done and self.check_separated(map_clone, self.pps[0]):
             if static_brain is None:
-                winner = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+                print("this part should not be executed")
+                # _, _ = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             else:
-                winner = self.get_longest_path_masking(static_brain)
+                if not vs_minimax:
+                    _, p1_exact = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+                winner, p1_length = self.get_longest_path_masking(static_brain, vs_minimax=vs_minimax)
 
             if winner == 1:
                 self.pps[1].alive = False
@@ -247,6 +264,8 @@ class Game:
             else:
                 self.pps[0].alive = False
                 self.pps[1].alive = False
+
+            sep = True
 
         if window:
             import pygame
@@ -266,18 +285,19 @@ class Game:
                             self.winner = 1
                         return False
 
-        return True
+        return True, p1_length, p1_exact, sep
 
-    def step(self, action_p1, action_p2, static_brain=None):
+    def step(self, action_p1, action_p2, static_brain=None, end_separated=False):
         alive_count = 0
         alive = None
-        self.reword = 10
 
-        if not self.next_frame(action_p1, action_p2, static_brain=static_brain):
+        is_next_frame, p1_len, p1_exact, sep = self.next_frame(action_p1, action_p2, static_brain=static_brain, end_separated=end_separated)
+
+        if not is_next_frame:
             self.done = True
 
             print("is not next frame")
-            return self.next_p1, self.reword, self.next_p2, self.reword, self.done,self.loser_len,self.winner_len
+            return self.next_p1, self.next_p2, self.done, p1_len, p1_exact, sep
 
         for pp in self.pps:
             if pp.alive:
@@ -292,9 +312,9 @@ class Game:
 
             self.done = True
 
-        return self.next_p1, self.reword, self.next_p2, self.reword, self.done,0,0
+        return self.next_p1, self.next_p2, self.done, p1_len, p1_exact, sep
 
-    def main_loop(self,model, pop=None,window=None,model2=None,condition=None):
+    def main_loop(self,model, pop=None,window=None,model2=None,condition=None, static_brain=None, end_separated=False, vs_minimax=False):
 
         if window:
             window.render_map(self.map())
@@ -332,10 +352,15 @@ class Game:
 
                 else:
                     action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
-                    action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
+                    if vs_minimax:
+                        action2 = 0
+                    else:
+                        action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
 
+            is_next_frame, _, _, _ = self.next_frame(action1, action2, window, static_brain=static_brain, end_separated=end_separated,
+                            vs_minimax=vs_minimax)
 
-            if not self.next_frame(action1,action2,window):
+            if not is_next_frame:
                 break
 
             for pp in self.pps:

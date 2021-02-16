@@ -181,3 +181,88 @@ def get_mask(game_map, x, y, mask):
         mask = get_mask(game_map, x, y - 1, mask)
 
     return mask
+
+
+def get_direction_area(game_map, x, y):
+
+    area1, area2, area3, area4 = 0, 0, 0, 0
+    max_value = 0
+
+    if game_map[x - 1, y] == 0: # up
+        game_map[x - 1, y] = -1
+        area1 = get_area(game_map, x - 1, y, -1, area1 + 1)
+
+    if max_value < area1:
+        max_value = area1
+
+    if game_map[x, y + 1] == 0: # right
+        game_map[x, y + 1] = -2
+        area2 = get_area(game_map, x, y + 1, -2, area2 + 1)
+    elif game_map[x, y + 1] == -1:
+        area2 = area1
+
+    if max_value < area2:
+        max_value = area2
+
+    if game_map[x + 1, y] == 0: # down
+        game_map[x + 1, y] = -3
+        area3 = get_area(game_map, x + 1, y, -3, area3 + 1)
+    elif game_map[x + 1, y] == -1:
+        area3 = area1
+    elif game_map[x + 1, y] == -2:
+        area3 = area2
+
+    if max_value < area3:
+        max_value = area3
+
+    if game_map[x, y - 1] == 0: # left
+        game_map[x, y - 1] = -4
+        area4 = get_area(game_map, x, y - 1, -4, area4 + 1)
+    elif game_map[x, y - 1] == -1:
+        area4 = area1
+    elif game_map[x, y - 1] == -2:
+        area4 = area2
+    elif game_map[x, y - 1] == -2:
+        area4 = area3
+
+    if max_value < area4:
+        max_value = area4
+
+    max_list = []
+
+    if max_value <= area1: # up
+        max_list.append(1)
+
+    if max_value <= area2: # right
+        max_list.append(2)
+
+    if max_value <= area3: # down
+        max_list.append(3)
+
+    if max_value <= area4: # left
+        max_list.append(4)
+
+    action = random.choice(max_list)
+
+    return action
+
+
+def get_area(game_map, x, y, mark, area):
+
+    if game_map[x + 1, y] == 0:
+        game_map[x + 1, y] = mark
+        area = get_area(game_map, x + 1, y, mark, area + 1)
+
+    if game_map[x - 1, y] == 0:
+        game_map[x - 1, y] = mark
+        area = get_area(game_map, x - 1, y, mark, area + 1)
+
+    if game_map[x, y + 1] == 0:
+        game_map[x, y + 1] = mark
+        area = get_area(game_map, x, y + 1, mark, area + 1)
+
+    if game_map[x, y - 1] == 0:
+        game_map[x, y - 1] = mark
+        area = get_area(game_map, x, y - 1, mark, area + 1)
+
+    return area
