@@ -24,9 +24,7 @@ folderName='save'
 class RolloutStorage(object):
     '''Advantage 학습에 사용할 메모리 클래스'''
     def __init__(self, num_steps, num_processes):
-
-        # self.observations = torch.zeros(num_steps + 1, num_processes,3,12,12)
-        self.observations = torch.zeros(num_steps + 1, num_processes, 2, 12, 12)
+        self.observations = torch.zeros(num_steps + 1, num_processes, 2, MAP_WIDTH + 2, MAP_HEIGHT + 2)
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
         self.rewards = torch.zeros(num_steps, num_processes, 1)
         self.actions = torch.zeros(num_steps, num_processes, 1).long()
@@ -83,7 +81,7 @@ class Brain_static(object):
         num_processes = NUM_PROCESSES
 
         values, action_log_probs, entropy = self.actor_critic.evaluate_actions(
-            rollouts.observations[:-1].view(-1, 2, 12, 12).to(device).detach(),
+            rollouts.observations[:-1].view(-1, 2, MAP_WIDTH + 2, MAP_HEIGHT + 2).to(device).detach(),
             rollouts.actions.view(-1, 1).to(device).detach())
 
         # 주의 : 각 변수의 크기
@@ -175,17 +173,17 @@ def train(args):
     writer = SummaryWriter(eventid)
 
     if args.m == "2":
-        actor_critic = Net2()  # 신경망 객체 생성
+        actor_critic = NetStatic()  # 신경망 객체 생성
     elif args.m == "3":
-        actor_critic = Net3()
+        actor_critic = NetStatic()
     else:
-        actor_critic = Net3()
+        actor_critic = NetStatic()
 
     global_brain = Brain_static(actor_critic, args, acktr=True)
 
     rollouts = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
-    obs_np = np.zeros([NUM_PROCESSES,12,12])  # Numpy 배열 # 게임 상황이 12x12임
+    obs_np = np.zeros([NUM_PROCESSES, MAP_WIDTH + 2, MAP_HEIGHT + 2])  # Numpy 배열 # 게임 상황이 12x12임
     reward_np = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
     each_step = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
 
@@ -200,7 +198,7 @@ def train(args):
 
     player_head = [torch.nonzero(obs[i, 1] == 10).squeeze(0) for i in range(NUM_PROCESSES)]
     obs_uni = [obs[i, 0] + obs[i, 1] for i in range(NUM_PROCESSES)]
-    masking = [get_mask(obs_uni[i], player_head[i][0].item(), player_head[i][1].item(), torch.ones((12, 12))) for i in range(NUM_PROCESSES)]
+    masking = [get_mask(obs_uni[i], player_head[i][0].item(), player_head[i][1].item(), torch.ones((MAP_WIDTH + 2, MAP_HEIGHT + 2))) for i in range(NUM_PROCESSES)]
 
     for i in range(NUM_PROCESSES):
         obs[i, 0] = masking[i]
@@ -271,7 +269,7 @@ def train(args):
             for i in range(NUM_PROCESSES):
                 player_head[i] = torch.nonzero(obs[i, 1] == 10).squeeze(0) if done_np[i] else player_head[i]
                 obs_uni[i] = obs[i, 0] + obs[i, 1] if done_np[i] else obs_uni[i]
-                masking[i] = get_mask(obs_uni[i], player_head[i][0].item(), player_head[i][1].item(), torch.ones((12, 12))) if done_np[i] else masking[i]
+                masking[i] = get_mask(obs_uni[i], player_head[i][0].item(), player_head[i][1].item(), torch.ones((MAP_WIDTH + 2, MAP_HEIGHT + 2))) if done_np[i] else masking[i]
 
             for i in range(NUM_PROCESSES):
                 obs[i, 0] = masking[i] if done_np[i] else masking[i]

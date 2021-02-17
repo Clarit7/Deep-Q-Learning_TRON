@@ -4,6 +4,7 @@ from orderedset import OrderedSet
 
 from tron.map import Map, Tile
 from tron.player import ACPlayer
+from config import *
 
 import torch
 import numpy as np
@@ -186,7 +187,7 @@ class Game:
             static_env = make_static_game(static_brain is not None, self.map(invert=True), player_head)
 
         obs_uni = obs[0] + obs[1]
-        masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(), torch.ones((12, 12)))
+        masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(), torch.ones((MAP_WIDTH + 2, MAP_HEIGHT + 2)))
         masking = torch.where(obs[1] != 0, torch.zeros(1), masking)
         obs[0] = masking
 
@@ -211,7 +212,6 @@ class Game:
         return duration - 1
 
     def next_frame(self, action_p1, action_p2, window=None, static_brain=None, end_separated=False, vs_minimax=False):
-
         map_clone = self.map()
 
         action = [action_p1, action_p2]
@@ -245,16 +245,35 @@ class Game:
         self.next_p2 = self.history[-1].map.state_for_player(2)
 
         p1_length = 0
-        p1_exact = 0
+        p1_area = 0
 
         sep = False
         if end_separated and not done and self.check_separated(map_clone, self.pps[0]):
             if static_brain is None:
-                print("this part should not be executed")
-                # _, _ = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+                from tron.util import get_area, pop_up
+                obs_np1 = np.copy(map_clone.state_for_player(1))
+                obs1 = pop_up(obs_np1)
+                obs1 = torch.tensor(obs1).float()
+                p1_a = get_area(obs1[0] + obs1[1] + obs1[2], self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, -1, 0)
+
+                obs_np2 = np.copy(map_clone.state_for_player(2))
+                obs2 = pop_up(obs_np2)
+                obs2 = torch.tensor(obs2).float()
+                p2_a = get_area(obs2[0] + obs2[1] + obs2[2], self.pps[1].position[0] + 1, self.pps[1].position[1] + 1,-1, 0)
+
+                if p1_a > p2_a:
+                    winner = 1
+                elif p2_a > p1_a:
+                    winner = 2
+                else:
+                    winner = 0
             else:
                 if not vs_minimax:
-                    _, p1_exact = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+                    from tron.util import get_area, pop_up
+                    obs_np = np.copy(map_clone.state_for_player(1))
+                    obs = pop_up(obs_np)
+                    obs = torch.tensor(obs).float()
+                    p1_area = get_area(obs[0] + obs[1] + obs[2], self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, -1, 0)
                 winner, p1_length = self.get_longest_path_masking(static_brain, vs_minimax=vs_minimax)
 
             if winner == 1:
@@ -285,19 +304,19 @@ class Game:
                             self.winner = 1
                         return False
 
-        return True, p1_length, p1_exact, sep
+        return True, p1_length, p1_area, sep
 
     def step(self, action_p1, action_p2, static_brain=None, end_separated=False):
         alive_count = 0
         alive = None
 
-        is_next_frame, p1_len, p1_exact, sep = self.next_frame(action_p1, action_p2, static_brain=static_brain, end_separated=end_separated)
+        is_next_frame, p1_len, p1_area, sep = self.next_frame(action_p1, action_p2, static_brain=static_brain, end_separated=end_separated)
 
         if not is_next_frame:
             self.done = True
 
             print("is not next frame")
-            return self.next_p1, self.next_p2, self.done, p1_len, p1_exact, sep
+            return self.next_p1, self.next_p2, self.done, p1_len, p1_area, sep
 
         for pp in self.pps:
             if pp.alive:
@@ -312,14 +331,14 @@ class Game:
 
             self.done = True
 
-        return self.next_p1, self.next_p2, self.done, p1_len, p1_exact, sep
+        return self.next_p1, self.next_p2, self.done, p1_len, p1_area, sep
 
     def main_loop(self,model, pop=None,window=None,model2=None,condition=None, static_brain=None, end_separated=False, vs_minimax=False):
 
         if window:
             window.render_map(self.map())
 
-        if (not model2):
+        if not model2:
             model2=model
 
         while True:
@@ -331,7 +350,7 @@ class Game:
 
             map=self.map()
 
-            if(pop == None):
+            if pop == None:
                 with torch.no_grad():
                     action1 = model.act(torch.tensor(np.reshape(map.state_for_player(1), (1, 1, map.state_for_player(1).shape[0],
                                                                                           map.state_for_player(1).shape[1]))).float())
@@ -339,7 +358,7 @@ class Game:
                                                                                           map.state_for_player(2).shape[1]))).float())
 
             else:
-                if(condition):
+                if condition:
                     with torch.no_grad():
                         action1 = model.act(torch.tensor(np.expand_dims(pop(map.state_for_player(1)), axis=0)).float())
 
