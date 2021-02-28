@@ -161,28 +161,29 @@ def train(args):
 
     ai_p1=True
     ai_p2=True
-    end_separated = True if args.end_separated is None else args.end_separated
+    e = True if args.e is None else args.e
     p = "1" if args.p is None else args.p
     v = "1" if args.v is None else args.v
     m = "1" if args.m is None else args.m
-    r = "1" if args.r is None else args.r
-    a = False if args.a is None else args.a
+    a = True if args.a is None else args.a
     unique= "" if args.u is None else args.u
 
     envs = [make_game(ai_p1, ai_p2) for i in range(NUM_PROCESSES)]
 
-    eventid = datetime.now().strftime('runs/ACKTR-%Y%m-%d%H-%M%S-ent ') + str(entropy_coef) + '-pol ' + p + '-val ' + v + '-step' + str(
-        NUM_ADVANCED_STEP) + '-process ' + str(NUM_PROCESSES) + unique + '-model ' + m + '-reward ' + r
+    area = "True" if a else "False"
+    separated = "False"
 
-    writer = SummaryWriter(eventid)
+    eventid = datetime.now().strftime('ACKTR-%Y.%m.%d-%H:%M:%S-ent:') + str(entropy_coef) + '-pol:' + p + '-val:' + v + '-step:' + str(
+        NUM_ADVANCED_STEP) + '-process:' + str(NUM_PROCESSES) + '-size:' + str(MAP_HEIGHT) + '-area:' + area + '-sep:' + separated + '-' + unique
 
+    writer = SummaryWriter('runs/' + eventid)
 
-    if args.m == "2":
-        actor_critic = Net()  # 신경망 객체 생성
-    elif args.m == "3":
+    if m == "2":
+        actor_critic = Net12()  # 신경망 객체 생성
+    elif m == "3":
         actor_critic = Net14()
     else:
-        actor_critic = Net()
+        actor_critic = Net10()
 
     global_brain = Brain(actor_critic,args, acktr=True)
 
@@ -205,14 +206,12 @@ def train(args):
     # 초기 상태로부터 시작
 
     obs1 = [pop_up(envs[i].map().state_for_player(1)) for i in range(NUM_PROCESSES)]
-    # obs1 = [envs[i].map().state_for_player(1) for i in range(NUM_PROCESSES)]
     obs1 = np.array(obs1)
     obs1 = torch.from_numpy(obs1).float()  # torch.Size([32, 4])
 
     current_obs1 = obs1  # 가장 최근의 obs를 저장
 
     obs2 = [pop_up(envs[i].map().state_for_player(2)) for i in range(NUM_PROCESSES)]
-    # obs2 = [envs[i].map().state_for_player(2) for i in range(NUM_PROCESSES)]
     obs2 = np.array(obs2)
     obs2 = torch.from_numpy(obs2).float()  # torch.Size([32, 4])
 
@@ -225,19 +224,21 @@ def train(args):
     losscount = 0
     duration = 0
 
-    if args.r == "2":
-        reward_constants = reward_cons2
-    elif args.r == "3":
-        reward_constants = reward_cons3
+    if m == "2":
+        ac_static = NetStatic12()
+        static_brain = Brain(ac_static, args, acktr=True)
+        static_brain.actor_critic.load_state_dict(torch.load('./ACKTR_pretrain-2021.02.23-15_57_56-ent_0.15-pol_1.0-val_0.8-step_5-process_16-size_12-12_40k_model.bak'))
+    elif m == "3":
+        ac_static = NetStatic14()
+        static_brain = Brain(ac_static, args, acktr=True)
+        static_brain.actor_critic.load_state_dict(torch.load('./ACKTR_pretrain-2021.02.22-11_09_55-ent_0.1-pol_1.2-val_0.7-step_5-process_16-size_14-14_40k_model.bak'))
     else:
-        reward_constants = reward_cons1
-
-    ac_static = NetStatic()
-    static_brain = Brain(ac_static,args, acktr=True)
-    static_brain.actor_critic.load_state_dict(torch.load('./ACKTR_pretrain_6k.bak'))
+        ac_static = NetStatic10()
+        static_brain = Brain(ac_static, args, acktr=True)
+        static_brain.actor_critic.load_state_dict(torch.load('./ACKTR_pretrain-2021.02.22-05_09_11-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-10_40k_model.bak'))
 
     # 1 에피소드에 해당하는 반복문
-    while True:  # 전체 for문
+    while losscount < 40000:  # 전체 for문
         # advanced 학습 대상이 되는 각 단계에 대해 계산
         for step in range(NUM_ADVANCED_STEP):
             # 행동을 선택
@@ -255,13 +256,13 @@ def train(args):
                 act2 = actions2[i] if ai_p2 else minimax.action(envs[i].map(), 2)
 
                 obs_np1[i], obs_np2[i], done_np[i], p1_len, p1_area, sep = \
-                    envs[i].step(act1, act2, static_brain.actor_critic if not a else None, end_separated)
+                    envs[i].step(act1, act2, static_brain.actor_critic if not a else None, e)
 
                 each_step1[i] += 1
                 each_step2[i] += 1
 
                 if done_np[i]:
-                    reward_np1[i],reward_np2[i]=get_reward(envs[i], reward_constants)
+                    reward_np1[i], reward_np2[i] = get_reward(envs[i], reward_cons)
                     if sep:
                         p1_len_sum += p1_len
                         p1_area_sum += p1_area
@@ -334,15 +335,6 @@ def train(args):
         prob1_loss_sum1 += prob1
         advan_loss_sum1 += advan1
 
-        # if(gamecount>2000):
-        #     pygame.init()
-        #     game = make_game(True, True)
-        #     pygame.mouse.set_visible(False)
-        #
-        #     window = Window(game, 40)
-        #
-        #     game.main_loop(global_brain.actor_critic, pop_up, window)
-
         if losscount%SHOW_ITER == 0:
             total_loss_sum1 = total_loss_sum1 / SHOW_ITER
             val_loss_sum1 = val_loss_sum1 / SHOW_ITER
@@ -356,8 +348,7 @@ def train(args):
             if total_loss_sum1 < min_loss:
                 min_loss = act_loss_sum1
 
-            torch.save(global_brain.actor_critic.state_dict(), 'save/' + 'ACKTR_player'+m + unique +'.bak')
-            # torch.save(global_brain2.actor_critic.state_dict(), 'ais/a3c/' + 'player_2.bak')
+            torch.save(global_brain.actor_critic.state_dict(), 'save/' + eventid +'.bak')
 
             writer.add_scalar('Training loss', total_loss_sum1, losscount)
             writer.add_scalar('Value loss', val_loss_sum1, losscount)
@@ -367,14 +358,17 @@ def train(args):
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
             if losscount % 200 == 0:
-                for i in range(PLAY_WITH_MINIMAX):
-                    game = make_game(True, False, 'fair')
-                    game.main_loop(global_brain.actor_critic, pop_up, static_brain=static_brain.actor_critic, end_separated=end_separated, vs_minimax=True)
+                if losscount % 2000 == 0:
+                    for i in range(PLAY_WITH_MINIMAX):
+                        game = make_game(True, False, 'fair')
+                        game.main_loop(global_brain.actor_critic, pop_up, static_brain=static_brain.actor_critic if not a else None, end_separated=e, vs_minimax=True)
 
-                    if game.winner == 1:
-                        p1_win += 1
-                    elif game.winner is None:
-                        game_draw += 1
+                        if game.winner == 1:
+                            p1_win += 1
+                        elif game.winner is None:
+                            game_draw += 1
+
+                    writer.add_scalar('minimax rating', p1_win / (PLAY_WITH_MINIMAX - game_draw), losscount)
 
                 if p1_area_sum == 0:
                     approx_percentage = 0
@@ -382,7 +376,6 @@ def train(args):
                     approx_percentage = p1_len_sum / p1_area_sum
 
                 writer.add_scalar('approx_len / area', approx_percentage, losscount)
-                writer.add_scalar('minimax rating', p1_win/(PLAY_WITH_MINIMAX - game_draw), losscount)
 
                 p1_len_sum = 0
                 p1_area_sum = 0
@@ -403,19 +396,16 @@ def train(args):
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--end_separated', required=False, help='True if end condition is separated')
     parser.add_argument('-m', required=False, help='model structure number')
-    parser.add_argument('-r', required=False, help='reward condition number')
-
     parser.add_argument('-p', required=False, help='policy coefficient')
     parser.add_argument('-v', required=False, help='value coefficient')
     parser.add_argument('-a', required=False, help='get area instead of length')
+    parser.add_argument('-e', required=False, help='True if end condition is separated')
     parser.add_argument('-u', required=False, help='unique string')
 
     args = parser.parse_args()
 
     train(args)
-
 
 if __name__ == "__main__":
     main()

@@ -110,24 +110,22 @@ class Game:
 
     def get_longest_path(self, map_clone, p1, p2):
         p1_length = self.get_length(np.copy(map_clone.state_for_player(1)), p1.position[0] + 1, p1.position[1] + 1, 0, None)
-        """
         p2_length = self.get_length(np.copy(map_clone.state_for_player(2)), p2.position[0] + 1, p2.position[1] + 1, 0, None)
 
         # if p2_length == -10 or p1_length < p2_length:
         if p1_length < p2_length:
             self.loser_len=p1_length
             self.winner_len=p2_length
-            return 2, p1_length, p2_length
+            return 2, p1_length - 1
 
         elif p1_length > p2_length:
 
             self.loser_len=p2_length
             self.winner_len=p1_length
 
-            return 1, p1_length, p2_length
+            return 1, p1_length - 1
         else:
-            return 0, p1_length, p2_length
-        """
+            return 0, p1_length - 1
 
         return 0, p1_length-1
 
@@ -148,19 +146,19 @@ class Game:
 
         l1, l2, l3, l4 = -1, -1, -1, -1
         if map_clone[x, y - 1] == 1:
-            l1 = self.get_length(map_clone.copy(), x, y - 1, length, prev_length)
+            l1 = self.get_length(map_clone, x, y - 1, length, prev_length)
             if l1 == -10:
                 return -10
         if map_clone[x + 1, y] == 1:
-            l2 = self.get_length(map_clone.copy(), x + 1, y, length, prev_length)
+            l2 = self.get_length(map_clone, x + 1, y, length, prev_length)
             if l2 == -10:
                 return -10
         if map_clone[x, y + 1] == 1:
-            l3 = self.get_length(map_clone.copy(), x, y + 1, length, prev_length)
+            l3 = self.get_length(map_clone, x, y + 1, length, prev_length)
             if l3 == -10:
                 return -10
         if map_clone[x - 1, y] == 1:
-            l4 = self.get_length(map_clone.copy(), x - 1, y, length, prev_length)
+            l4 = self.get_length(map_clone, x - 1, y, length, prev_length)
             if l4 == -10:
                 return -10
 
@@ -248,7 +246,10 @@ class Game:
         p1_area = 0
 
         sep = False
+        """"
         if end_separated and not done and self.check_separated(map_clone, self.pps[0]):
+            print("errrrrrrrrrrrrrrrrrrrrrrror")
+            print(end_separated)
             if static_brain is None:
                 from tron.util import get_area, pop_up
                 obs_np1 = np.copy(map_clone.state_for_player(1))
@@ -267,6 +268,7 @@ class Game:
                     winner = 2
                 else:
                     winner = 0
+                winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             else:
                 if not vs_minimax:
                     from tron.util import get_area, pop_up
@@ -285,6 +287,7 @@ class Game:
                 self.pps[1].alive = False
 
             sep = True
+        """
 
         if window:
             import pygame

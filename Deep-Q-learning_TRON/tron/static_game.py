@@ -5,6 +5,7 @@ from tron.map import Map, Tile
 from tron.player import ACPlayer
 from tron.minimax import MinimaxPlayer
 from orderedset import OrderedSet
+from config import *
 
 import torch
 import numpy as np
@@ -116,7 +117,7 @@ class StaticGame:
 
         same_move_combo = 0
 
-        while 0 <= self.wall[0] <= 9 and 0 <= self.wall[1] <= 9:
+        while 0 <= self.wall[0] <= MAP_WIDTH - 1 and 0 <= self.wall[1] <= MAP_HEIGHT - 1:
             self.mmap.__setitem__(self.wall, Tile.PLAYER_TWO_BODY)
             body_list.append(self.wall.copy())
 
