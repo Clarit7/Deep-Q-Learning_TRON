@@ -236,7 +236,7 @@ def get_direction_area(game_map, x, y):
 
     action = random.choice(max_list)
 
-    return action
+    return action, max_value
 
 
 def get_area(game_map, x, y, mark, area):

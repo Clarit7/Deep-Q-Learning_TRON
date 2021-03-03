@@ -1,6 +1,6 @@
 import pygame
 from tron.window import Window
-from Net.ACNet import Net3
+from Net.ACNet import *
 from tron.util import *
 from ACKTR import Brain
 from Net.DQNNet import Net as DQNNET
@@ -8,7 +8,7 @@ import argparse
 
 import random
 
-folderName = 'save'
+folderName = 'ex_saves'
 
 
 def random_position(width, height):
@@ -46,17 +46,17 @@ def print_game_results(game):
 
 def main(args):
     pygame.init()
-    rating=False
-    iter=30
+    rating=True
+    iter=100
 
-    actor_critic = Net3()  # 신경망 객체 생성
+    actor_critic = Net10()  # 신경망 객체 생성
     global_brain = Brain(actor_critic,args, acktr=True)
-    global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player3small.bak'))
+    global_brain.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR-2021.02.23-18_57_50-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-area_False-sep_True-10_40k_model.bak'))
     # global_brain.actor_critic.eval()
 
-    actor_critic2 = Net3()  # 신경망 객체 생성
+    actor_critic2 = Net10()  # 신경망 객체 생성
     global_brain2 = Brain(actor_critic2,args, acktr=True)
-    # global_brain2.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR_player_test.bak'))
+    global_brain2.actor_critic.load_state_dict(torch.load(folderName + '/ACKTR-2021.02.25-14_51_20-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-area_True-sep_True-10_40k_area_model.bak'))
     # global_brain2.actor_critic.eval()
 
     # DQN=DQNNET()
@@ -69,11 +69,11 @@ def main(args):
         p2_win = 0
 
         for i in range(iter):
-            game = make_game(False, False, "fair")
+            game = make_game(True, True, "fair")
             pygame.mouse.set_visible(False)
             window = None
 
-            game.main_loop(global_brain.actor_critic, pop_up, window, DQN, ("AC", "DQN"))
+            game.main_loop(global_brain.actor_critic, pop_up, window, global_brain2.actor_critic, ("AC", "DQN"))
 
             if game.winner is None:
                 nullgame+=1
