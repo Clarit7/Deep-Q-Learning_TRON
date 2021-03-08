@@ -17,7 +17,7 @@ def main(args):
     elif args.a == "4":
         b = 4
     else:
-        b = 2
+        b = 1
 
     if args.c == "2":
         c = 2
@@ -26,7 +26,7 @@ def main(args):
     elif args.c == "4":
         c = 4
     else:
-        c = 2
+        c = 1
 
     if m == "2":
         actor_critic = Net12()  # 신경망 객체 생성
@@ -186,8 +186,8 @@ def main(args):
     for i in range(iter):
         game = make_game(True, True, "fair")
         game.main_loop(global_brain.actor_critic, pop_up, None, global_brain2.actor_critic,
-                       static_brain=static_brain.actor_critic if b == 1 else None,
-                       static_brain2=static_brain2.actor_critic if c == 1 else None,
+                       static_brain=static_brain.actor_critic if b == 1 or b == 2 else None,
+                       static_brain2=static_brain2.actor_critic if c == 1 or c == 2 else None,
                        oneshot_brain=global_brain.actor_critic if b == 4 else None,
                        oneshot_brain2=global_brain2.actor_critic if c == 4 else None,
                        end_separated=True, agent1=b, agent2=c)

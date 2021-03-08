@@ -17,11 +17,11 @@ NUM_ATOM = 16
 
 # A2C 손실함수 계산에 사용되는 상수
 value_loss_coef = 0.7
-entropy_coef = 0.15
+entropy_coef = 0.01
 policy_loss_coef = 1.2
 max_grad_norm = 0.5
 
-MAP_WIDTH = 14
+MAP_WIDTH = 10
 MAP_HEIGHT = MAP_WIDTH
 
 SHOW_ITER = 20

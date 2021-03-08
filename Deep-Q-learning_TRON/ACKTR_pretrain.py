@@ -172,11 +172,11 @@ def train(args):
     writer = SummaryWriter('runs/' + eventid)
 
     if args.m == "2":
-        actor_critic = NetStatic12()  # 신경망 객체 생성
+        actor_critic = NetStatic8()  # 신경망 객체 생성
     elif args.m == "3":
-        actor_critic = NetStatic14()
-    else:
         actor_critic = NetStatic10()
+    else:
+        actor_critic = NetStatic6()
 
     global_brain = Brain_static(actor_critic, args, acktr=True)
 
@@ -234,7 +234,8 @@ def train(args):
                     if i == 0:
                         gamecount += 1
                         duration += each_step[i] - 1
-                        area_sum += get_area(obs_uni[0], player_head[0][0], player_head[0][1], -1, 0)
+                        _, area = get_direction_area(obs_uni[0], player_head[0][0], player_head[0][1])
+                        area_sum += area
 
                         if gamecount % SHOW_ITER == 0:
                             print('%d Episode: Finished after %d steps' % (gamecount, each_step[i]))

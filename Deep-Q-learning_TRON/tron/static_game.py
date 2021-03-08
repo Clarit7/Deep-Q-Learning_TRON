@@ -121,7 +121,9 @@ class StaticGame:
             self.mmap.__setitem__(self.wall, Tile.PLAYER_TWO_BODY)
             body_list.append(self.wall.copy())
 
-            if same_move_combo > 6:
+            threshold = MAP_WIDTH - 3
+
+            if same_move_combo > threshold:
                 same_move_combo = 0
                 while prev_move == current_move:
                     if prev_move == left:
@@ -305,3 +307,19 @@ class StaticGame:
 
             if window:
                 window.render_map(self.map())
+
+    def for_test(self):
+        from tron.util import get_direction_area, pop_up_static
+
+        map_clone = self.map()
+
+        obs_np1 = np.copy(map_clone.state_for_player(1))
+        obs1 = pop_up_static(obs_np1)
+        obs1 = torch.tensor(obs1).float()
+        _, p1_area = get_direction_area(obs1[0] + obs1[1],
+                                       self.pp.position[0] + 1, self.pp.position[1] + 1)
+
+        p1_len = self.get_length(np.copy(map_clone.state_for_player(1)),
+                                 self.pp.position[0] + 1, self.pp.position[1] + 1, 0, None)
+
+        return p1_area, p1_len

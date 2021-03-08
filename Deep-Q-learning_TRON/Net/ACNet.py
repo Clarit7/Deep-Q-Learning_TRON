@@ -156,9 +156,9 @@ class NetStatic10(Net):
         x = self.activation(self.conv5(x))
         x = self.activation(self.conv6(x)+idx)
 
-        x = self.pool(x)
-
         x = self.activation(self.conv7(x))
+
+        x = self.pool(x)
 
         x = x.view(-1, 64*3*3)
 
@@ -172,7 +172,7 @@ class NetStatic10(Net):
 
         return critic_output, actor_output
 
-class NetStatic12(Net):
+class NetStatic8(Net):
     def __init__(self):
         super(Net, self).__init__()
 
@@ -186,12 +186,11 @@ class NetStatic12(Net):
         self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
         self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
 
+        self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
+
         self.pool=nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
 
-        self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
-        self.conv8 = nn.Conv2d(64, 64, 5, padding=2, stride=2)
-
-        self.fc1 = nn.Linear(64*2*2, 256)
+        self.fc1 = nn.Linear(64*3*3, 256)
         self.fc2 = nn.Linear(256, 128)
 
         self.actor1 = nn.Linear(128, 64)
@@ -223,12 +222,11 @@ class NetStatic12(Net):
         x = self.activation(self.conv5(x))
         x = self.activation(self.conv6(x)+idx)
 
+        x = self.activation(self.conv7(x))
+
         x = self.pool(x)
 
-        x = self.activation(self.conv7(x))
-        x = self.activation(self.conv8(x))
-
-        x = x.view(-1, 64*2*2)
+        x = x.view(-1, 64*3*3)
 
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))
@@ -240,7 +238,7 @@ class NetStatic12(Net):
 
         return critic_output, actor_output
 
-class NetStatic14(Net):
+class NetStatic6(Net):
     def __init__(self):
         super(Net, self).__init__()
 
@@ -254,10 +252,9 @@ class NetStatic14(Net):
         self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
         self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
 
-        self.pool=nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
-
         self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
-        self.conv8 = nn.Conv2d(64, 64, 5, padding=2, stride=2)
+
+        self.pool=nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
 
         self.fc1 = nn.Linear(64*2*2, 256)
         self.fc2 = nn.Linear(256, 128)
@@ -291,10 +288,9 @@ class NetStatic14(Net):
         x = self.activation(self.conv5(x))
         x = self.activation(self.conv6(x)+idx)
 
-        x = self.pool(x)
-
         x = self.activation(self.conv7(x))
-        x = self.activation(self.conv8(x))
+
+        x = self.pool(x)
 
         x = x.view(-1, 64*2*2)
 
@@ -322,11 +318,11 @@ class Net10(Net):
         self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
         self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
 
-        self.pool = nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
-
         self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
 
-        self.fc1 = nn.Linear(64 * 3 * 3, 256)
+        self.pool = nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
+
+        self.fc1 = nn.Linear(64 * 2 * 2, 256)
         self.fc2 = nn.Linear(256, 128)
 
         self.actor1 = nn.Linear(128, 64)
@@ -337,6 +333,7 @@ class Net10(Net):
         self.critic3 = nn.Linear(16, 1)
 
         self.dropout = nn.Dropout(p=0.2)
+        # self.activation = torch.nn.Tanh()
         self.activation = self.mish
 
     def forward(self, x):
@@ -358,11 +355,11 @@ class Net10(Net):
         x = self.activation(self.conv5(x))
         x = self.activation(self.conv6(x)+idx)
 
-        x = self.pool(x)
-
         x = self.activation(self.conv7(x))
 
-        x = x.view(-1, 64 * 3 * 3)
+        x = self.pool(x)
+
+        x = x.view(-1, 64 * 2 * 2)
 
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))

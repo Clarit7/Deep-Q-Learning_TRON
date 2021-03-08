@@ -171,7 +171,7 @@ def train(args):
     envs = [make_game(ai_p1, ai_p2) for i in range(NUM_PROCESSES)]
 
     area = "True" if a else "False"
-    separated = "False"
+    separated = "True"
 
     eventid = datetime.now().strftime('ACKTR-%Y.%m.%d-%H:%M:%S-ent:') + str(entropy_coef) + '-pol:' + p + '-val:' + v + '-step:' + str(
         NUM_ADVANCED_STEP) + '-process:' + str(NUM_PROCESSES) + '-size:' + str(MAP_HEIGHT) + '-area:' + area + '-sep:' + separated + '-' + unique
@@ -357,8 +357,8 @@ def train(args):
             writer.add_scalar('Action log probability', prob1_loss_sum1, losscount)
             writer.add_scalar('Advantage', advan_loss_sum1, losscount)
 
-            if losscount % 200 == 0:
-                if losscount % 2000 == 0:
+            if losscount % 20 == 0:
+                if losscount % 200 == 0:
                     for i in range(PLAY_WITH_MINIMAX):
                         game = make_game(True, False, 'fair')
                         game.main_loop(global_brain.actor_critic, pop_up, static_brain=static_brain.actor_critic if not a else None, end_separated=e, vs_minimax=True)

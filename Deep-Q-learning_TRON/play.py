@@ -46,7 +46,7 @@ def print_game_results(game):
 
 def main(args):
     pygame.init()
-    rating=True
+    rating=False
     iter=100
 
     actor_critic = Net10()  # 신경망 객체 생성
