@@ -322,7 +322,7 @@ class Game:
             """
 
             if static_brain is None:
-                """
+
                 from tron.util import get_direction_area, pop_up
                 obs_np1 = np.copy(map_clone.state_for_player(1))
                 obs1 = pop_up(obs_np1)
@@ -340,18 +340,19 @@ class Game:
                     winner = 2
                 else:
                     winner = 0
-                """
-                print('backtracking')
-                winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+
+                # winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             else:
+                """
                 if not vs_minimax:
                     from tron.util import get_direction_area, pop_up
                     obs_np = np.copy(map_clone.state_for_player(1))
                     obs = pop_up(obs_np)
                     obs = torch.tensor(obs).float()
                     p1_area = get_direction_area(obs[0] + obs[1] + obs[2], self.pps[0].position[0] + 1, self.pps[0].position[1] + 1)
-                winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
-                # winner, p1_length = self.get_longest_path_masking(static_brain, vs_minimax=vs_minimax)
+                # winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+                """
+                winner, p1_length = self.get_longest_path_masking(static_brain, vs_minimax=vs_minimax)
 
             """
             if p1_len > p2_len:

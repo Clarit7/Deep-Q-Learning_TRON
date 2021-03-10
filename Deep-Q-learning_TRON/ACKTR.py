@@ -161,20 +161,30 @@ def train(args):
 
     ai_p1=True
     ai_p2=True
-    e = True if args.e is None else args.e
+
+    if args.e is None:
+        e = True
+    elif args.e == "True":
+        e = True
+    else:
+        e = False
+
+    if args.a is None:
+        a = True
+    elif args.a == "True":
+        a = True
+    else:
+        a = False
+
     p = "1" if args.p is None else args.p
     v = "1" if args.v is None else args.v
     m = "1" if args.m is None else args.m
-    a = True if args.a is None else args.a
     unique= "" if args.u is None else args.u
 
     envs = [make_game(ai_p1, ai_p2) for i in range(NUM_PROCESSES)]
 
-    area = "True" if a else "False"
-    separated = "True"
-
     eventid = datetime.now().strftime('ACKTR-%Y.%m.%d-%H:%M:%S-ent:') + str(entropy_coef) + '-pol:' + p + '-val:' + v + '-step:' + str(
-        NUM_ADVANCED_STEP) + '-process:' + str(NUM_PROCESSES) + '-size:' + str(MAP_HEIGHT) + '-area:' + area + '-sep:' + separated + '-' + unique
+        NUM_ADVANCED_STEP) + '-process:' + str(NUM_PROCESSES) + '-size:' + str(MAP_HEIGHT) + '-area:' + str(a) + '-sep:' + str(e) + '-' + unique
 
     writer = SummaryWriter('runs/' + eventid)
 
@@ -193,7 +203,6 @@ def train(args):
     reward_np1 = np.zeros([NUM_PROCESSES, 1])  # Numpy 배열
     each_step1 = np.zeros(NUM_PROCESSES)  # 각 환경의 단계 수를 기록
     p1_len_sum = 0
-    p1_area_sum = 0
 
     rollouts2 = RolloutStorage(NUM_ADVANCED_STEP, NUM_PROCESSES)  # rollouts 객체
     episode_rewards2 = torch.zeros([NUM_PROCESSES, 1])  # 현재 에피소드의 보상
@@ -225,17 +234,17 @@ def train(args):
     duration = 0
 
     if m == "2":
-        ac_static = NetStatic12()
+        ac_static = NetStatic8()
         static_brain = Brain(ac_static, args, acktr=True)
-        static_brain.actor_critic.load_state_dict(torch.load('./ACKTR_pretrain-2021.02.23-15_57_56-ent_0.15-pol_1.0-val_0.8-step_5-process_16-size_12-12_40k_model.bak'))
+        static_brain.actor_critic.load_state_dict(torch.load('./ex_saves2/ACKTR_pretrain-2021.03.08-21_40_47-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_8-8_40k_pretrain.bak'))
     elif m == "3":
-        ac_static = NetStatic14()
-        static_brain = Brain(ac_static, args, acktr=True)
-        static_brain.actor_critic.load_state_dict(torch.load('./ACKTR_pretrain-2021.02.22-11_09_55-ent_0.1-pol_1.2-val_0.7-step_5-process_16-size_14-14_40k_model.bak'))
-    else:
         ac_static = NetStatic10()
         static_brain = Brain(ac_static, args, acktr=True)
-        static_brain.actor_critic.load_state_dict(torch.load('./ACKTR_pretrain-2021.02.22-05_09_11-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-10_40k_model.bak'))
+        static_brain.actor_critic.load_state_dict(torch.load('./ex_saves2/ACKTR_pretrain-2021.03.09-14_42_32-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-10_40k_pretrain.bak'))
+    else:
+        ac_static = NetStatic6()
+        static_brain = Brain(ac_static, args, acktr=True)
+        static_brain.actor_critic.load_state_dict(torch.load('./ex_saves2/ACKTR_pretrain-2021.03.08-15_49_13-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_6-6_40k_pretrain.bak'))
 
     # 1 에피소드에 해당하는 반복문
     while losscount < 40000:  # 전체 for문
@@ -265,7 +274,6 @@ def train(args):
                     reward_np1[i], reward_np2[i] = get_reward(envs[i], reward_cons)
                     if sep:
                         p1_len_sum += p1_len
-                        p1_area_sum += p1_area
 
                     if i == 0:
                         gamecount += 1
@@ -370,15 +378,7 @@ def train(args):
 
                     writer.add_scalar('minimax rating', p1_win / (PLAY_WITH_MINIMAX - game_draw), losscount)
 
-                if p1_area_sum == 0:
-                    approx_percentage = 0
-                else:
-                    approx_percentage = p1_len_sum / p1_area_sum
-
-                writer.add_scalar('approx_len / area', approx_percentage, losscount)
-
                 p1_len_sum = 0
-                p1_area_sum = 0
 
             p1_win = 0
             game_draw = 0

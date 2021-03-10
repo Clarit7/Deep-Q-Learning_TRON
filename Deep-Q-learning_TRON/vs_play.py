@@ -3,7 +3,7 @@ from tron.util import *
 from ACKTR import Brain
 import argparse
 
-folderName = 'ex_saves'
+folderName = 'ex_saves2'
 
 def main(args):
     iter=1000
