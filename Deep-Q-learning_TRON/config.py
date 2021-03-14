@@ -28,6 +28,7 @@ SHOW_ITER = 20
 
 PLAY_WITH_MINIMAX=50
 
+
 # 리워드 function
 win=1.0
 lose=-1.0

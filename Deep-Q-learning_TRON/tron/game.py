@@ -146,19 +146,19 @@ class Game:
 
         l1, l2, l3, l4 = -1, -1, -1, -1
         if map_clone[x, y - 1] == 1:
-            l1 = self.get_length(map_clone.copy(), x, y - 1, length, prev_length)
+            l1 = self.get_length(map_clone, x, y - 1, length, prev_length)
             if l1 == -10:
                 return -10
         if map_clone[x + 1, y] == 1:
-            l2 = self.get_length(map_clone.copy(), x + 1, y, length, prev_length)
+            l2 = self.get_length(map_clone, x + 1, y, length, prev_length)
             if l2 == -10:
                 return -10
         if map_clone[x, y + 1] == 1:
-            l3 = self.get_length(map_clone.copy(), x, y + 1, length, prev_length)
+            l3 = self.get_length(map_clone, x, y + 1, length, prev_length)
             if l3 == -10:
                 return -10
         if map_clone[x - 1, y] == 1:
-            l4 = self.get_length(map_clone.copy(), x - 1, y, length, prev_length)
+            l4 = self.get_length(map_clone, x - 1, y, length, prev_length)
             if l4 == -10:
                 return -10
 
@@ -284,7 +284,7 @@ class Game:
         p1_area = 0
 
         sep = False
-        if not done and self.check_separated(map_clone, self.pps[0]):
+        if end_separated and not done and self.check_separated(map_clone, self.pps[0]):
             """
             if agent1 == 2:
                 from tron.util import get_direction_area, pop_up
@@ -322,7 +322,7 @@ class Game:
             """
 
             if static_brain is None:
-
+                """
                 from tron.util import get_direction_area, pop_up
                 obs_np1 = np.copy(map_clone.state_for_player(1))
                 obs1 = pop_up(obs_np1)
@@ -340,8 +340,8 @@ class Game:
                     winner = 2
                 else:
                     winner = 0
-
-                # winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
+                """
+                winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             else:
                 """
                 if not vs_minimax:
