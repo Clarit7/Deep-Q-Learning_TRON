@@ -304,7 +304,7 @@ class NetStatic6(Net):
 
         return critic_output, actor_output
 
-class Net10(Net):
+class Net6(Net):
     def __init__(self):
         super(Net, self).__init__()
 
@@ -373,7 +373,7 @@ class Net10(Net):
 
 
 
-class Net12(Net):
+class Net8(Net):
     def __init__(self):
         super(Net, self).__init__()
 
@@ -387,12 +387,11 @@ class Net12(Net):
         self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
         self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
 
+        self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
+
         self.pool = nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
 
-        self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
-        self.conv8 = nn.Conv2d(64, 64, 5, padding=2, stride=2)
-
-        self.fc1 = nn.Linear(64 * 2 * 2, 256)
+        self.fc1 = nn.Linear(64 * 3 * 3, 256)
         self.fc2 = nn.Linear(256, 128)
 
         self.actor1 = nn.Linear(128, 64)
@@ -424,12 +423,11 @@ class Net12(Net):
         x = self.activation(self.conv5(x))
         x = self.activation(self.conv6(x) + idx)
 
+        x = self.activation(self.conv7(x))
+
         x = self.pool(x)
 
-        x = self.activation(self.conv7(x))
-        x = self.activation(self.conv8(x))
-
-        x = x.view(-1, 64 * 2 * 2)
+        x = x.view(-1, 64 * 3 * 3)
 
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))
@@ -442,7 +440,7 @@ class Net12(Net):
         return critic_output, actor_output
 
 
-class Net14(Net):
+class Net10(Net):
     def __init__(self):
         super(Net, self).__init__()
 
@@ -456,12 +454,11 @@ class Net14(Net):
         self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
         self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
 
+        self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
+
         self.pool = nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
 
-        self.conv7 = nn.Conv2d(64, 64, 7, padding=3, stride=2)
-        self.conv8 = nn.Conv2d(64, 64, 5, padding=2, stride=2)
-
-        self.fc1 = nn.Linear(64 * 2 * 2, 256)
+        self.fc1 = nn.Linear(64 * 3 * 3, 256)
         self.fc2 = nn.Linear(256, 128)
 
         self.actor1 = nn.Linear(128, 64)
@@ -493,12 +490,11 @@ class Net14(Net):
         x = self.activation(self.conv5(x))
         x = self.activation(self.conv6(x) + idx)
 
+        x = self.activation(self.conv7(x))
+
         x = self.pool(x)
 
-        x = self.activation(self.conv7(x))
-        x = self.activation(self.conv8(x))
-
-        x = x.view(-1, 64 * 2 * 2)
+        x = x.view(-1, 64 * 3 * 3)
 
         x = self.dropout(self.activation(self.fc1(x)))
         x = self.dropout(self.activation(self.fc2(x)))

@@ -146,19 +146,49 @@ class Game:
 
         l1, l2, l3, l4 = -1, -1, -1, -1
         if map_clone[x, y - 1] == 1:
-            l1 = self.get_length(map_clone, x, y - 1, length, prev_length)
+            l1 = self.get_length(map_clone.copy(), x, y - 1, length, prev_length)
             if l1 == -10:
                 return -10
         if map_clone[x + 1, y] == 1:
-            l2 = self.get_length(map_clone, x + 1, y, length, prev_length)
+            l2 = self.get_length(map_clone.copy(), x + 1, y, length, prev_length)
             if l2 == -10:
                 return -10
         if map_clone[x, y + 1] == 1:
-            l3 = self.get_length(map_clone, x, y + 1, length, prev_length)
+            l3 = self.get_length(map_clone.copy(), x, y + 1, length, prev_length)
             if l3 == -10:
                 return -10
         if map_clone[x - 1, y] == 1:
-            l4 = self.get_length(map_clone, x - 1, y, length, prev_length)
+            l4 = self.get_length(map_clone.copy(), x - 1, y, length, prev_length)
+            if l4 == -10:
+                return -10
+
+        if prev_length is not None and max(l1, l2, l3, l4) > prev_length:
+            return -10
+
+        if l1 == -1 and l2 == -1 and l3 == -1 and l4 == -1:
+            return length
+
+        return max(l1, l2, l3, l4)
+
+    def get_length_greedy(self, map_clone, x, y, length, prev_length):
+        length += 1
+        map_clone[x, y] = 5
+
+        l1, l2, l3, l4 = -1, -1, -1, -1
+        if map_clone[x, y - 1] == 1:
+            l1 = self.get_length_greedy(map_clone, x, y - 1, length, prev_length)
+            if l1 == -10:
+                return -10
+        if map_clone[x + 1, y] == 1:
+            l2 = self.get_length_greedy(map_clone, x + 1, y, length, prev_length)
+            if l2 == -10:
+                return -10
+        if map_clone[x, y + 1] == 1:
+            l3 = self.get_length_greedy(map_clone, x, y + 1, length, prev_length)
+            if l3 == -10:
+                return -10
+        if map_clone[x - 1, y] == 1:
+            l4 = self.get_length_greedy(map_clone, x - 1, y, length, prev_length)
             if l4 == -10:
                 return -10
 
@@ -284,8 +314,7 @@ class Game:
         p1_area = 0
 
         sep = False
-        if end_separated and not done and self.check_separated(map_clone, self.pps[0]):
-            """
+        if not done and self.check_separated(map_clone, self.pps[0]):
             if agent1 == 2:
                 from tron.util import get_direction_area, pop_up
                 obs_np1 = np.copy(map_clone.state_for_player(1))
@@ -293,11 +322,16 @@ class Game:
                 obs1 = torch.tensor(obs1).float()
                 _, p1_len = get_direction_area(obs1[0] + obs1[1] + obs1[2],
                                             self.pps[0].position[0] + 1, self.pps[0].position[1] + 1)
+                p1_len = self.get_length_greedy(np.copy(map_clone.state_for_player(1)),
+                                         self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, 0, None) - 1
+                # p1_len = self.get_length_masking(1, static_brain)
             elif agent1 == 3:
                 p1_len = self.get_length(np.copy(map_clone.state_for_player(1)),
                                          self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, 0, None) - 1
             elif agent1 == 4:
-                p1_len = self.get_length_oneshot(1, oneshot_brain)
+                # p1_len = self.get_length_oneshot(1, oneshot_brain)
+                p1_len = self.get_length_greedy(np.copy(map_clone.state_for_player(1)),
+                                         self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, 0, None) - 1
             else:
                 p1_len = self.get_length_masking(1, static_brain)
 
@@ -308,21 +342,23 @@ class Game:
                 obs2 = torch.tensor(obs2).float()
                 _, p2_len = get_direction_area(obs2[0] + obs2[1] + obs2[2],
                                             self.pps[1].position[0] + 1, self.pps[1].position[1] + 1,)
-                p2_len = self.get_length(np.copy(map_clone.state_for_player(2)),
+                p2_len = self.get_length_greedy(np.copy(map_clone.state_for_player(2)),
                                          self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, 0, None) - 1
+                # p2_len = self.get_length_masking(2, static_brain2)
             elif agent2 == 3:
                 p2_len = self.get_length(np.copy(map_clone.state_for_player(2)),
                                          self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, 0, None) - 1
             elif agent2 == 4:
-                p2_len = self.get_length_oneshot(2, oneshot_brain2)
+                # p2_len = self.get_length_oneshot(2, oneshot_brain2)
+                p2_len = self.get_length_greedy(np.copy(map_clone.state_for_player(2)),
+                                         self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, 0, None) - 1
             else:
                 p2_len = self.get_length_masking(2, static_brain2)
 
             # winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             """
-
             if static_brain is None:
-                """
+
                 from tron.util import get_direction_area, pop_up
                 obs_np1 = np.copy(map_clone.state_for_player(1))
                 obs1 = pop_up(obs_np1)
@@ -340,10 +376,9 @@ class Game:
                     winner = 2
                 else:
                     winner = 0
-                """
+
                 winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             else:
-                """
                 if not vs_minimax:
                     from tron.util import get_direction_area, pop_up
                     obs_np = np.copy(map_clone.state_for_player(1))
@@ -351,7 +386,7 @@ class Game:
                     obs = torch.tensor(obs).float()
                     p1_area = get_direction_area(obs[0] + obs[1] + obs[2], self.pps[0].position[0] + 1, self.pps[0].position[1] + 1)
                 # winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
-                """
+
                 winner, p1_length = self.get_longest_path_masking(static_brain, vs_minimax=vs_minimax)
 
             """
@@ -361,7 +396,6 @@ class Game:
                 winner = 2
             else:
                 winner = 0
-            """
 
             if winner == 1:
                 self.pps[1].alive = False

@@ -189,11 +189,11 @@ def train(args):
     writer = SummaryWriter('runs/' + eventid)
 
     if m == "2":
-        actor_critic = Net12()  # 신경망 객체 생성
+        actor_critic = Net8()  # 신경망 객체 생성
     elif m == "3":
-        actor_critic = Net14()
-    else:
         actor_critic = Net10()
+    else:
+        actor_critic = Net6()
 
     global_brain = Brain(actor_critic,args, acktr=True)
 

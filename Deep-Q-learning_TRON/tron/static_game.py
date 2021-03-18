@@ -201,19 +201,19 @@ class StaticGame:
         map_clone[x, y] = 5
         l1, l2, l3, l4 = -1, -1, -1, -1
         if map_clone[x, y - 1] == 1:
-            l1 = self.get_length(map_clone, x, y - 1, length + 1, prev_length)
+            l1 = self.get_length(map_clone.copy(), x, y - 1, length + 1, prev_length)
             if l1 == -10:
                 return -10
         if map_clone[x + 1, y] == 1:
-            l2 = self.get_length(map_clone, x + 1, y, length + 1, prev_length)
+            l2 = self.get_length(map_clone.copy(), x + 1, y, length + 1, prev_length)
             if l2 == -10:
                 return -10
         if map_clone[x, y + 1] == 1:
-            l3 = self.get_length(map_clone, x, y + 1, length + 1, prev_length)
+            l3 = self.get_length(map_clone.copy(), x, y + 1, length + 1, prev_length)
             if l3 == -10:
                 return -10
         if map_clone[x - 1, y] == 1:
-            l4 = self.get_length(map_clone, x - 1, y, length + 1, prev_length)
+            l4 = self.get_length(map_clone.copy(), x - 1, y, length + 1, prev_length)
             if l4 == -10:
                 return -10
 
@@ -308,7 +308,7 @@ class StaticGame:
             if window:
                 window.render_map(self.map())
 
-    def for_test(self):
+    def for_test(self, static_brain=None):
         from tron.util import get_direction_area, pop_up_static
 
         map_clone = self.map()
@@ -319,7 +319,43 @@ class StaticGame:
         _, p1_area = get_direction_area(obs1[0] + obs1[1],
                                        self.pp.position[0] + 1, self.pp.position[1] + 1)
 
+        """
         p1_len = self.get_length(np.copy(map_clone.state_for_player(1)),
                                  self.pp.position[0] + 1, self.pp.position[1] + 1, 0, None)
+        """
+
+        p1_len = self.get_length_masking(1, static_brain)
 
         return p1_area, p1_len
+
+    def get_length_masking(self, player_num, static_brain):
+        from tron.util import pop_up_static, make_static_game, get_mask
+
+        obs_np = self.map().state_for_player(player_num)
+        obs = pop_up_static(obs_np)
+        obs = torch.tensor(np.array(obs)).float()
+
+        player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+
+        static_env = make_static_game(static_brain is not None, self.map(), player_head)
+
+        obs_uni = obs[0] + obs[1]
+        masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(), torch.ones((MAP_WIDTH + 2, MAP_HEIGHT + 2)))
+        masking = torch.where(obs[1] != 0, torch.zeros(1), masking)
+        obs[0] = masking
+
+        duration = 0
+        done = 0
+
+        while done == 0:
+            duration += 1
+
+            with torch.no_grad():
+                act = static_brain.act(obs.unsqueeze(0))
+
+            obs_np, done = static_env.step(act, is_area=True)
+            obs = pop_up_static(obs_np)
+            obs = torch.tensor(np.array(obs)).float()
+            obs[0] = masking
+
+        return duration - 1
