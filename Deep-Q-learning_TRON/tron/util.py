@@ -5,7 +5,7 @@ from config import *
 from tron.game import *
 from tron.static_game import StaticGame
 from tron.minimax import MinimaxPlayer
-from tron.player import KeyboardPlayer,ACPlayer
+from tron.player import *
 
 def pop_up(map):
     my = np.zeros((map.shape[0],map.shape[1]))

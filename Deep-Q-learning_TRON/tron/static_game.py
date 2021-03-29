@@ -319,14 +319,21 @@ class StaticGame:
         _, p1_area = get_direction_area(obs1[0] + obs1[1],
                                        self.pp.position[0] + 1, self.pp.position[1] + 1)
 
+        p1_len = self.get_length_oneshot(1, static_brain)
+
+
         """
         p1_len = self.get_length(np.copy(map_clone.state_for_player(1)),
                                  self.pp.position[0] + 1, self.pp.position[1] + 1, 0, None)
-        """
+        
+        p1_len = self.get_minimax_length(1)
+
 
         p1_len = self.get_length_masking(1, static_brain)
+        """
 
         return p1_area, p1_len
+
 
     def get_length_masking(self, player_num, static_brain):
         from tron.util import pop_up_static, make_static_game, get_mask
@@ -357,5 +364,69 @@ class StaticGame:
             obs = pop_up_static(obs_np)
             obs = torch.tensor(np.array(obs)).float()
             obs[0] = masking
+
+        return duration - 1
+
+    def get_minimax_length(self, player_num):
+        from tron.util import pop_up_static, make_static_game, get_mask, get_direction_area
+
+        obs_np = self.map().state_for_player(player_num)
+        obs = pop_up_static(obs_np)
+        obs = torch.tensor(np.array(obs)).float()
+
+        player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+
+        if player_num == 1:
+            static_env = make_static_game(False, self.map(), player_head)
+        else:
+            static_env = make_static_game(False, self.map(), player_head)
+
+        obs_uni = obs[0] + obs[1]
+        masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(),
+                           torch.ones((MAP_WIDTH + 2, MAP_HEIGHT + 2)))
+        masking = torch.where(obs[1] != 0, torch.zeros(1), masking)
+        obs[0] = masking
+
+        duration = 0
+        done = 0
+
+        while done == 0:
+            duration += 1
+
+            obs_uni = obs[0] + obs[1]
+            player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+            act, _ = get_direction_area(obs_uni, player_head[0].item(), player_head[1].item())
+
+            obs_np, done = static_env.step(act, is_area=True)
+            obs = pop_up_static(obs_np)
+            obs = torch.tensor(np.array(obs)).float()
+            obs[0] = masking
+
+        return duration - 1
+
+    def get_length_oneshot(self, player_num, oneshot_brain):
+        from tron.util import pop_up, get_direction_area
+
+        obs_np = self.map().state_for_player(player_num)
+        obs = pop_up(obs_np)
+        obs = torch.tensor(np.array(obs)).float()
+
+        duration = 0
+        done = 0
+
+        while done == 0:
+            duration += 1
+            if oneshot_brain is not None:
+                with torch.no_grad():
+                    act = oneshot_brain.act(obs.unsqueeze(0))
+            else:
+                print("oneshot error")
+                obs_uni = obs[0] + obs[1] + obs[2]
+                player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+                act, _ = get_direction_area(obs_uni, player_head[0].item(), player_head[1].item())
+
+            obs_np, done = self.step(act, is_area=True)
+            obs = pop_up(obs_np)
+            obs = torch.tensor(np.array(obs)).float()
 
         return duration - 1

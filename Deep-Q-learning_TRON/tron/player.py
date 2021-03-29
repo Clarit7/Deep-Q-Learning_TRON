@@ -1,5 +1,6 @@
 from enum import Enum
-
+import numpy as np
+import random
 
 class Direction(Enum):
     UP = 1
@@ -45,6 +46,10 @@ class Player(object):
 class Mode(Enum):
     ARROWS = 1
     ZQSD = 2
+
+    # for RandomPlayer
+    PURE = 3
+    STRAIGHT = 4
 
 
 class KeyboardPlayer(Player):
@@ -117,9 +122,66 @@ class ACPlayer(Player):
             next_direction = Direction.LEFT
         return next_direction
 
+    def next_position(self, current_position, direction):
+        if direction == Direction.UP:
+            return current_position[0] - 1, current_position[1]
+        elif direction == Direction.RIGHT:
+            return current_position[0], current_position[1] + 1
+        elif direction == Direction.DOWN:
+            return current_position[0] + 1, current_position[1]
+        elif direction == Direction.LEFT:
+            return current_position[0], current_position[1] - 1
+
     def next_position_and_direction(self, current_position, action):
         direction = self.get_direction(action)
         return self.next_position(current_position, direction), direction
+
+
+class RandomPlayer(Player):
+
+    def __init__(self, mode = Mode.STRAIGHT):
+        super(RandomPlayer, self).__init__()
+        self.direction = None
+        self.mode = mode
+
+    def get_direction(self, map, id):
+        game_map = map.state_for_player(id)
+        ind = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
+        blocked = np.zeros(4)
+
+        if game_map[ind[0], ind[1] - 1] != 1:
+            blocked[0] = 1
+        if game_map[ind[0] + 1, ind[1]] != 1:
+            blocked[1] = 1
+        if game_map[ind[0], ind[1] + 1] != 1:
+            blocked[2] = 1
+        if game_map[ind[0] - 1, ind[1]] != 1:
+            blocked[3] = 1
+
+        all_blocked = True
+        for element in blocked:
+            if element == 0:
+                all_blocked = False
+                break
+
+        next_action = random.randint(1, 4)
+        if not all_blocked:
+            while (blocked[next_action - 1] == 1):
+                next_action = random.randint(1, 4)
+
+            if self.direction is not None and blocked[self.direction.value - 1] == 0 and self.mode == Mode.STRAIGHT:
+                next_action = self.direction
+
+        if next_action == 1:
+            self.direction = Direction.UP
+        if next_action == 2:
+            self.direction = Direction.RIGHT
+        if next_action == 3:
+            self.direction = Direction.DOWN
+        if next_action == 4:
+            self.direction = Direction.LEFT
+
+        return self.direction
 
     def next_position(self, current_position, direction):
         if direction == Direction.UP:
@@ -130,3 +192,7 @@ class ACPlayer(Player):
             return current_position[0] + 1, current_position[1]
         elif direction == Direction.LEFT:
             return current_position[0], current_position[1] - 1
+
+    def next_position_and_direction(self, current_position, map, id):
+        direction = self.get_direction(map, id)
+        return self.next_position(current_position, direction), direction

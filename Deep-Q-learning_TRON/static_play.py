@@ -5,20 +5,20 @@ from ACKTR import Brain
 import argparse
 
 def main(args):
-    iter=10000
+    iter=5000
     folderName = 'ex_saves2'
 
     area_sum = 0
     len_sum = 0
 
-    ac_static = NetStatic8()
+    ac_static = Net8()
     static_brain = Brain(ac_static, args, acktr=True)
     static_brain.actor_critic.load_state_dict(torch.load(
-        folderName + '/ACKTR_pretrain-2021.03.09-14_42_32-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-10_40k_pretrain.bak'))
+        folderName + '/ACKTR-2021.03.17-12_25_08-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-area_True-sep_False-10_40k_oneshot_model.bak'))
     static_brain.actor_critic.eval()
 
     for i in range(iter):
-        game = make_static_game(False)
+        game = make_static_game(True)
 
         area, len = game.for_test(static_brain=static_brain.actor_critic)
 

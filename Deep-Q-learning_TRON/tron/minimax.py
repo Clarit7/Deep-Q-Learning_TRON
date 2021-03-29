@@ -313,7 +313,6 @@ class MinimaxPlayer(Player):
         return next_direction
 
     def next_position_and_direction(self, current_position,id,map, static_action=None):
-
         direction = self.action(map,id, static_action)
         return self.next_position(current_position, direction), direction
 

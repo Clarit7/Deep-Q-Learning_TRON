@@ -6,10 +6,9 @@ import argparse
 folderName = 'ex_saves2'
 
 def main(args):
-    iter=500
+    iter=5000
 
     m = "1" if args.m is None else args.m
-
     if args.b == "2":
         b = 2
     elif args.b == "3":
@@ -95,9 +94,6 @@ def main(args):
                 folderName + '/ACKTR-2021.03.17-12_24_50-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_8-area_True-sep_False-8_40k_oneshot_model.bak'))
         elif c == 6:
             pass
-        elif c == 7:
-            global_brain2.actor_critic.load_state_dict(torch.load(
-                folderName + '/ACKTR-2021.03.05-17_55_16-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_6-area_True-sep_True-backtracking.bak'))
         else:
             global_brain2.actor_critic.load_state_dict(torch.load(
                 folderName + '/ACKTR-2021.03.15-16_06_55-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_8-area_False-sep_True-8_40k_model.bak'))
@@ -253,28 +249,14 @@ def main(args):
     p1_win = 0
     p2_win = 0
 
-    for i in range(iter):
-        game = make_game(True if b!= 6 else False, True if c != 6 else False, "fair")
-        game.main_loop(global_brain.actor_critic, pop_up, None, global_brain2.actor_critic,
-                       static_brain=static_brain.actor_critic if b == 1 or b == 2 else None,
-                       static_brain2=static_brain2.actor_critic if c == 1 or c == 2 else None,
-                       oneshot_brain=global_brain.actor_critic if b == 5 else None,
-                       oneshot_brain2=global_brain2.actor_critic if c == 5 else None,
-                       end_separated=True, agent1=b, agent2=c)
+    len_sum = 0
+    area_sum = 0
+    area_count = 0
 
-        if game.winner is None:
-            nullgame+=1
-            print('draw')
-        elif game.winner ==1:
-            p1_win+=1
-            print('p1_win')
-        else:
-            p2_win+=1
-            print('p2_win')
-
-    for i in range(iter):
-        game = make_game(True if c!= 6 else False, True if b != 6 else False, "fair")
-        game.main_loop(global_brain2.actor_critic, pop_up, None, global_brain.actor_critic,
+    """
+    for _ in range(iter):
+        game = make_static_game(True if b != 6 else False, True if c != 6 else False, "fair")
+        p1_len, p1_area, p2_len, p2_area = game.main_loop(global_brain2.actor_critic, pop_up, None, global_brain.actor_critic,
                        static_brain=static_brain2.actor_critic if c == 1 or c == 2 else None,
                        static_brain2=static_brain.actor_critic if b == 1 or b == 2 else None,
                        oneshot_brain=global_brain2.actor_critic if c == 5 else None,
@@ -291,7 +273,54 @@ def main(args):
             p1_win+=1
             print('p1_win')
 
+        if p1_area != 0 and area_count < 10000:
+            area_sum += p1_area
+            len_sum += p1_len
+            area_count += 1
+
+        if p2_area != 0 and area_count < 10000:
+            area_sum += p2_area
+            len_sum += p2_len
+            area_count += 1
+
+        if area_count % 100 == 0:
+            print("Aria count:{}".format(float(area_count)))
+    """
+
+    while area_count < 5000:
+        game = make_game(True if b != 6 else False, True if c != 6 else False, "fair")
+        p1_len, p1_area, p2_len, p2_area = game.main_loop(global_brain2.actor_critic, pop_up, None, global_brain.actor_critic,
+                       static_brain=static_brain2.actor_critic if c == 1 or c == 2 else None,
+                       static_brain2=static_brain.actor_critic if b == 1 or b == 2 else None,
+                       oneshot_brain=global_brain2.actor_critic if c == 5 else None,
+                       oneshot_brain2=global_brain.actor_critic if b == 5 else None,
+                       end_separated=True, agent1=c, agent2=b)
+
+        if game.winner is None:
+            nullgame+=1
+            print('draw')
+        elif game.winner ==1:
+            p2_win+=1
+            print('p2_win')
+        else:
+            p1_win+=1
+            print('p1_win')
+
+        if p1_area != 0 and area_count < 10000:
+            area_sum += p1_area
+            len_sum += p1_len
+            area_count += 1
+
+        if p2_area != 0 and area_count < 10000:
+            area_sum += p2_area
+            len_sum += p2_len
+            area_count += 1
+
+        if area_count % 100 == 0:
+            print("Aria count:{}".format(float(area_count)))
+
     print("Player 1:{} \n Player 2:{}\n ".format(p1_win,p2_win))
+    print("Aria ratio:{}".format(float(len_sum / area_sum)))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

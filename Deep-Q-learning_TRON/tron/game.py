@@ -200,6 +200,44 @@ class Game:
 
         return max(l1, l2, l3, l4)
 
+    def get_minimax_length(self, player_num):
+        from tron.util import pop_up_static, make_static_game, get_mask, get_direction_area
+
+        obs_np = self.map().state_for_player(player_num)
+        obs = pop_up_static(obs_np)
+        obs = torch.tensor(np.array(obs)).float()
+
+        player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+
+        if player_num == 1:
+            static_env = make_static_game(False, self.map(invert=False), player_head)
+        else:
+            static_env = make_static_game(False, self.map(invert=True), player_head)
+
+        obs_uni = obs[0] + obs[1]
+        masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(),
+                           torch.ones((MAP_WIDTH + 2, MAP_HEIGHT + 2)))
+        masking = torch.where(obs[1] != 0, torch.zeros(1), masking)
+        obs[0] = masking
+
+        duration = 0
+        done = 0
+
+        while done == 0:
+            duration += 1
+
+            obs_uni = obs[0] + obs[1]
+            player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+            act, _ = get_direction_area(obs_uni, player_head[0].item(), player_head[1].item())
+
+            obs_np, done = static_env.step(act, is_area=True)
+            obs = pop_up_static(obs_np)
+            obs = torch.tensor(np.array(obs)).float()
+            obs[0] = masking
+
+        return duration - 1
+
+
     def get_length_masking(self, player_num, static_brain):
         from tron.util import pop_up_static, make_static_game, get_mask, get_direction_area
 
@@ -310,47 +348,50 @@ class Game:
         self.next_p1 = self.history[-1].map.state_for_player(1)
         self.next_p2 = self.history[-1].map.state_for_player(2)
 
-        p1_length = 0
+        p1_len = 0
         p1_area = 0
+        p2_len = 0
+        p2_area = 0
 
         sep = False
         if not done and self.check_separated(map_clone, self.pps[0]):
-            if agent1 == 2:
-                from tron.util import get_direction_area, pop_up
-                obs_np1 = np.copy(map_clone.state_for_player(1))
-                obs1 = pop_up(obs_np1)
-                obs1 = torch.tensor(obs1).float()
-                _, p1_len = get_direction_area(obs1[0] + obs1[1] + obs1[2],
-                                            self.pps[0].position[0] + 1, self.pps[0].position[1] + 1)
+
+            from tron.util import get_direction_area, pop_up
+            obs_np1 = np.copy(map_clone.state_for_player(1))
+            obs1 = pop_up(obs_np1)
+            obs1 = torch.tensor(obs1).float()
+            _, p1_area = get_direction_area(obs1[0] + obs1[1] + obs1[2],
+                                           self.pps[0].position[0] + 1, self.pps[0].position[1] + 1)
+
+            obs_np2 = np.copy(map_clone.state_for_player(2))
+            obs2 = pop_up(obs_np2)
+            obs2 = torch.tensor(obs2).float()
+            _, p2_area = get_direction_area(obs2[0] + obs2[1] + obs2[2],
+                                           self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, )
+
+            if agent1 == 3 or agent1 == 4:
                 p1_len = self.get_length_greedy(np.copy(map_clone.state_for_player(1)),
                                          self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, 0, None) - 1
-                # p1_len = self.get_length_masking(1, static_brain)
-            elif agent1 == 3:
+            elif agent1 == 5:
+                p1_len = self.get_length_oneshot(1, oneshot_brain)
+            elif agent1 == 6:
+                p1_len = self.get_minimax_length(1)
+            elif agent1 == 7:
                 p1_len = self.get_length(np.copy(map_clone.state_for_player(1)),
-                                         self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, 0, None) - 1
-            elif agent1 == 4:
-                # p1_len = self.get_length_oneshot(1, oneshot_brain)
-                p1_len = self.get_length_greedy(np.copy(map_clone.state_for_player(1)),
                                          self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, 0, None) - 1
             else:
                 p1_len = self.get_length_masking(1, static_brain)
 
-            if agent2 == 2:
-                from tron.util import get_direction_area, pop_up
-                obs_np2 = np.copy(map_clone.state_for_player(2))
-                obs2 = pop_up(obs_np2)
-                obs2 = torch.tensor(obs2).float()
-                _, p2_len = get_direction_area(obs2[0] + obs2[1] + obs2[2],
-                                            self.pps[1].position[0] + 1, self.pps[1].position[1] + 1,)
+
+            if agent2 == 3 or agent2 == 4:
                 p2_len = self.get_length_greedy(np.copy(map_clone.state_for_player(2)),
                                          self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, 0, None) - 1
-                # p2_len = self.get_length_masking(2, static_brain2)
-            elif agent2 == 3:
+            elif agent2 == 5:
+                p2_len = self.get_length_oneshot(2, oneshot_brain2)
+            elif agent2 == 6:
+                p2_len = self.get_minimax_length(2)
+            elif agent2 == 7:
                 p2_len = self.get_length(np.copy(map_clone.state_for_player(2)),
-                                         self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, 0, None) - 1
-            elif agent2 == 4:
-                # p2_len = self.get_length_oneshot(2, oneshot_brain2)
-                p2_len = self.get_length_greedy(np.copy(map_clone.state_for_player(2)),
                                          self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, 0, None) - 1
             else:
                 p2_len = self.get_length_masking(2, static_brain2)
@@ -425,7 +466,7 @@ class Game:
                             self.winner = 1
                         return False
 
-        return True, p1_length, p1_area, sep
+        return True, p1_len, p1_area, p2_len, p2_area, sep
 
     def step(self, action_p1, action_p2, static_brain=None, end_separated=False):
         alive_count = 0
@@ -518,7 +559,7 @@ class Game:
                         action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
                     """
 
-            is_next_frame, _, _, _ = self.next_frame(action1, action2, window,
+            is_next_frame, p1_len, p1_area, p2_len, p2_area, _ = self.next_frame(action1, action2, window,
                                                      static_brain=static_brain, static_brain2=static_brain2,
                                                      oneshot_brain=oneshot_brain, oneshot_brain2=oneshot_brain2,
                                                      end_separated=end_separated, vs_minimax=vs_minimax,
@@ -541,3 +582,5 @@ class Game:
 
             if window:
                 window.render_map(self.map())
+
+        return p1_len, p1_area, p2_len, p2_area
