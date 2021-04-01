@@ -353,6 +353,7 @@ class Game:
         p2_len = 0
         p2_area = 0
 
+
         sep = False
         if not done and self.check_separated(map_clone, self.pps[0]):
 

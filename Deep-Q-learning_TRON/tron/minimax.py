@@ -61,6 +61,115 @@ class Minimax(object):
         self.depth = depth
         self.mode = mode
 
+    def getAP(self, voronoi_region, ind, visited, parent, depth, low, current_depth, player, ap_list):
+        visited[ind] = 1
+        depth[ind] = current_depth
+        low[ind] = current_depth
+        childCount = 0
+        isAP = False
+
+        direction_list = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+
+
+        for e, direction in enumerate(direction_list):
+            ind_next = tuple(sum(elem) for elem in zip(ind, direction))
+            if voronoi_region[ind_next] == 5 * player and visited[ind_next] != 1:
+                parent[ind_next[0]][ind_next[1]] = ind
+                self.getAP(voronoi_region, ind_next, visited, parent, depth, low, current_depth + 1, player, ap_list)
+                childCount += 1
+
+                if low[ind_next] >= depth[ind]:
+                    isAP = True
+
+                low[ind] = min(low[ind], low[ind_next])
+            elif (voronoi_region[ind_next] == 5 * player or voronoi_region[ind_next] == 10 * player) \
+                    and ind_next != parent[ind[0]][ind[1]]:
+                low[ind] = min(low[ind], depth[ind_next])
+
+        if current_depth == 0:
+            print(low)
+            print(depth)
+
+        if (parent[ind[0]][ind[1]] != (-1, -1) and isAP) or (parent[ind[0]][ind[1]] == (-1, -1) and childCount > 1):
+            print(str(ind) + " is an AP")
+            ap_list.append(ind)
+
+    def getCompArea(self, ind, ap, voronoi_region, low, depth, visited, player, subComp):
+        current_low = low[ind]
+        node_queue = SetQueue()
+        node_queue._put(ind)
+        subComp.clear()
+        area = 0
+
+        direction_list = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+
+        while not node_queue.empty():
+            queue_elem = node_queue._get()
+            if visited[queue_elem] != 1:
+                visited[queue_elem] = 1
+                area += 1
+
+            adj_depth = []
+
+            for e, direction in enumerate(direction_list):
+                ind_next = tuple(sum(elem) for elem in zip(queue_elem, direction))
+
+                if visited[ind_next] == 0 and voronoi_region[ind_next] == 5 * player:
+                    if ind_next in ap:
+                        if current_low == low[ind_next]:
+                            node_queue._put(ind_next)
+                        subComp.append(ind_next)
+                    elif queue_elem in ap:
+                        if depth[ind_next] not in adj_depth and current_low == low[ind_next]:
+                            node_queue._put(ind_next)
+                            adj_depth.append(depth[ind_next])
+                        else:
+                            subComp.append(ind_next)
+                    elif queue_elem not in ap:
+                        node_queue._put(ind_next)
+
+        return area
+
+    def apSearch(self, ind, ap, voronoi_region, low, depth, visited, player):
+        subCompQueue = SetQueue()
+        subCompQueue._put(ind)
+        subCompList = [ind]
+        compNode = [ind]
+        compEdge = []
+        areaNode = [0]
+
+        while not subCompQueue.empty():
+            currentNode = subCompQueue._get()
+
+            subCompArea = self.getCompArea(currentNode, ap, voronoi_region, low, depth, visited, player, subCompList)
+            areaNode[compNode.index(currentNode)] += subCompArea
+
+            for sc in subCompList:
+                if sc not in compNode:
+                    compNode.append(sc)
+                    areaNode.append(0)
+                    compEdge.append((compNode.index(currentNode), compNode.index(sc)))
+                    subCompQueue.put(sc)
+
+            subCompList.clear()
+
+        max_area = self.pathDAG(ind, compNode, compEdge, areaNode)
+
+        return max_area
+
+    def pathDAG(self, ind, node, edge, area):
+        current_area =  area[node.index(ind)]
+        areaList = []
+
+        for e in edge:
+            if node[e[0]] == ind:
+                areaList.append(self.pathDAG(node[e[1]], node, edge, area))
+
+        if len(areaList) != 0:
+            current_area += max(areaList)
+
+        return current_area
+
     def get_shortest_path(self, game_map, ind, pl_mi):
         path_queue = SetQueue()
         dist_map = np.copy(game_map)
@@ -86,13 +195,12 @@ class Minimax(object):
         return dist_map
 
     def get_voronoi_value(self, game_map, ind1, ind2):
+
         p1_map = self.get_shortest_path(game_map, ind1, 1)
         p2_map = self.get_shortest_path(game_map, ind2, -1)
-
         p1_area = 0
         p2_area = 0
 
-        """ visual map (doesn't necessary)
         for i in range(p1_map.shape[0]):
             for j in range(p2_map.shape[1]):
                 if p2_map[i, j] == -2:
@@ -102,12 +210,39 @@ class Minimax(object):
                 elif p1_map[i, j] != -1:
                     if p1_map[i, j] + p2_map[i, j] == 0:
                         p1_map[i, j] = 0
+                    elif p1_map[i, j] == 1 and p2_map[i, j] == 1:
+                        p1_map[i, j] = 0
+                    elif p1_map[i, j] == 1:
+                        p1_map[i, j] = -5
+                        p2_area += 1
+                    elif  p2_map[i, j] == 1:
+                        p1_map[i, j] = 5
+                        p1_area += 1
                     elif p1_map[i, j] + p2_map[i, j] > 0:
                         p1_map[i, j] = -5
+                        p2_area += 1
                     else:
                         p1_map[i, j] = 5
-        """
+                        p1_area += 1
 
+        visited = np.zeros(shape=game_map.shape)
+        parent = [[(-1, -1) for _ in range(game_map.shape[0])] for _ in range(game_map.shape[1])]
+        p1_depth = np.zeros(shape=game_map.shape)
+        p2_depth = np.zeros(shape=game_map.shape)
+        p1_low = np.zeros(shape=game_map.shape)
+        p2_low = np.zeros(shape=game_map.shape)
+        p1_ap = []
+        p2_ap = []
+
+        self.getAP(p1_map.copy(), ind1, visited.copy(), parent.copy(), p1_depth, p1_low, 0, 1, p1_ap)
+        self.getAP(p1_map.copy(), ind2, visited.copy(), parent.copy(), p2_depth, p2_low, 0, -1, p2_ap)
+
+        p1_area = self.apSearch(ind1, p1_ap, p1_map.copy(), p1_low, p1_depth, visited.copy(), 1)
+        p2_area = self.apSearch(ind2, p2_ap, p1_map.copy(), p2_low, p2_depth, visited.copy(), -1)
+
+        print("p1 area : " + str(p1_area) + "   p2 area : " + str(p2_area))
+
+        """
         for i in range(p1_map.shape[0]):
             for j in range(p2_map.shape[1]):
                 if not p1_map[i, j] == -1 and not p1_map[i, j] == 2 and not p2_map[i, j] == -2:
@@ -119,6 +254,7 @@ class Minimax(object):
                         p1_area += 1
                     elif p1_map[i, j] + p2_map[i, j] > 0:
                         p2_area += 1
+        """
 
         return p1_area - p2_area
 
@@ -214,6 +350,7 @@ class Minimax(object):
     def minimax_search(self, node, game_map, depth, crash = False):
         if crash:  # head vs head crashing state
             node.set_value(0)
+            return 0
 
         if depth == 0:
             ind1 = np.unravel_index(np.argmax(game_map, axis=None), game_map.shape)
@@ -297,6 +434,8 @@ class MinimaxPlayer(Player):
         if static_action is None:
             self.initialize_minimax()
             game_map = map.state_for_player(id).T
+            game_map = np.where(game_map == -2, -1, game_map)
+            game_map = np.where(game_map == -3, -1, game_map)
             next_action = self.minimax.get_move(game_map)
         else:
             next_action = static_action

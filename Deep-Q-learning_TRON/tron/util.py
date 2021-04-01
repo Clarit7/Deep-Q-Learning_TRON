@@ -117,8 +117,8 @@ def make_game(p1,p2,mode=None):
     # Initialize the game
 
     game = Game(MAP_WIDTH, MAP_HEIGHT, [
-        PositionPlayer(1,  ACPlayer() if p1 else MinimaxPlayer(2, "voronoi"), [x1, y1]),
-        PositionPlayer(2,  ACPlayer() if p2 else MinimaxPlayer(2, "voronoi"), [x2, y2]), ])
+        PositionPlayer(1,  ACPlayer() if p1 else MinimaxPlayer(4, "voronoi"), [x1, y1]),
+        PositionPlayer(2,  ACPlayer() if p2 else MinimaxPlayer(4, "voronoi"), [x2, y2]), ])
     return game
 
 

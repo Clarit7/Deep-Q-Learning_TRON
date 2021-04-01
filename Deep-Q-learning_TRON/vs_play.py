@@ -23,7 +23,7 @@ def main(args):
     elif args.b == "7":
         b = 7
     else:
-        b = 1
+        b = 6
 
     if args.c == "2":
         c = 2
@@ -38,7 +38,7 @@ def main(args):
     elif args.c == "7":
         c = 7
     else:
-        c = 1
+        c = 6
 
     if m == "2":
         actor_critic = Net8()  # 신경망 객체 생성
