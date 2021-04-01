@@ -86,9 +86,6 @@ class Minimax(object):
                     and ind_next != parent[ind[0]][ind[1]]:
                 low[ind] = min(low[ind], depth[ind_next])
 
-        if current_depth == 0:
-            print(low)
-            print(depth)
 
         if (parent[ind[0]][ind[1]] != (-1, -1) and isAP) or (parent[ind[0]][ind[1]] == (-1, -1) and childCount > 1):
             print(str(ind) + " is an AP")
@@ -142,6 +139,7 @@ class Minimax(object):
             currentNode = subCompQueue._get()
 
             subCompArea = self.getCompArea(currentNode, ap, voronoi_region, low, depth, visited, player, subCompList)
+
             areaNode[compNode.index(currentNode)] += subCompArea
 
             for sc in subCompList:
@@ -153,20 +151,36 @@ class Minimax(object):
 
             subCompList.clear()
 
-        max_area = self.pathDAG(ind, compNode, compEdge, areaNode)
+        max_area = self.pathDAG(ind, compNode, compEdge, areaNode, ind, low)
 
         return max_area
 
-    def pathDAG(self, ind, node, edge, area):
+    def pathDAG(self, ind, node, edge, area, start_ind, low):
         current_area =  area[node.index(ind)]
+        start_low = low[start_ind]
         areaList = []
+        start_max = 0
+        temp = 0
+
+        direction_list = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+
+        if ind == start_ind:
+            ind_adj = [tuple(sum(elem) for elem in zip(start_ind, direction)) for direction in direction_list]
 
         for e in edge:
             if node[e[0]] == ind:
-                areaList.append(self.pathDAG(node[e[1]], node, edge, area))
+                temp = self.pathDAG(node[e[1]], node, edge, area, start_ind, low)
+
+                if ind == start_ind and node[e[1]] in ind_adj and low[node[e[1]]] != start_low and temp > start_max:
+                        start_max = temp
+                else:
+                    areaList.append(temp)
 
         if len(areaList) != 0:
             current_area += max(areaList)
+
+        if start_max + 1 > current_area:
+            current_area = start_max + 1
 
         return current_area
 
