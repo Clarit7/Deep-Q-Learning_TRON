@@ -207,8 +207,7 @@ class Minimax(object):
 
         return dist_map
 
-
-    def get_voronoi_value(self, game_map, ind1, ind2):
+    def get_ap_value(self, game_map, ind1, ind2):
         p1_map = self.get_shortest_path(game_map, ind1, 1)
         p2_map = self.get_shortest_path(game_map, ind2, -1)
         p1_area = 0
@@ -237,6 +236,21 @@ class Minimax(object):
                     else:
                         p1_map[i, j] = 5
                         p1_area += 1
+
+        visited = np.zeros(shape=game_map.shape)
+        parent = [[(-1, -1) for _ in range(game_map.shape[0])] for _ in range(game_map.shape[1])]
+        p1_depth = np.zeros(shape=game_map.shape)
+        p2_depth = np.zeros(shape=game_map.shape)
+        p1_low = np.zeros(shape=game_map.shape)
+        p2_low = np.zeros(shape=game_map.shape)
+        p1_ap = []
+        p2_ap = []
+
+        self.getAP(p1_map.copy(), ind1, visited.copy(), parent.copy(), p1_depth, p1_low, 0, 1, p1_ap)
+        self.getAP(p1_map.copy(), ind2, visited.copy(), parent.copy(), p2_depth, p2_low, 0, -1, p2_ap)
+
+        p1_area = self.apSearch(ind1, p1_ap, p1_map.copy(), p1_low, p1_depth, visited.copy(), 1)
+        p2_area = self.apSearch(ind2, p2_ap, p1_map.copy(), p2_low, p2_depth, visited.copy(), -1)
 
         return p1_area - p2_area
 
@@ -342,8 +356,8 @@ class Minimax(object):
                 cur_player_dist = self.distance_walls(game_map, ind1)
                 opp_player_dist = self.distance_walls(game_map, ind2)
                 node.set_value(cur_player_dist - opp_player_dist)
-            else:  # Mode.VORONOI
-                node.set_value(self.get_voronoi_value(game_map, ind1, ind2))
+            else:
+                node.set_value(self.get_ap_value(game_map, ind1, ind2))
 
             return 0  # for exit 1 recursion step
 
@@ -401,10 +415,10 @@ class Mode(Enum):
     VORONOI = 2
     AP = 3
 
-class MinimaxPlayer(Player):
+class MinimaxApPlayer(Player):
 
     def __init__(self, depth, mode = "voronoi"):
-        super(MinimaxPlayer, self).__init__()
+        super(MinimaxApPlayer, self).__init__()
         self.mode = Mode.VORONOI
         self.minimax = Minimax(depth, mode)
         self.direction = None

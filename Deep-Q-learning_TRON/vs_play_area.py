@@ -6,9 +6,9 @@ import argparse
 folderName = 'ex_saves2'
 
 def main(args):
-    iter=5000
 
     m = "1" if args.m is None else args.m
+
     if args.b == "2":
         b = 2
     elif args.b == "3":
@@ -21,6 +21,8 @@ def main(args):
         b = 6
     elif args.b == "7":
         b = 7
+    elif args.b == "8":
+        b = 8
     else:
         b = 1
 
@@ -36,6 +38,8 @@ def main(args):
         c = 6
     elif args.c == "7":
         c = 7
+    elif args.c == "8":
+        c = 8
     else:
         c = 1
 
@@ -195,6 +199,8 @@ def main(args):
         elif b == 6:
             pass
         elif b == 7:
+            pass
+        elif b == 8:
             global_brain.actor_critic.load_state_dict(torch.load(
                 folderName + '/ACKTR-2021.03.05-17_55_16-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_6-area_True-sep_True-backtracking.bak'))
         else:
@@ -231,6 +237,8 @@ def main(args):
         elif c == 6:
             pass
         elif c == 7:
+            pass
+        elif c == 8:
             global_brain2.actor_critic.load_state_dict(torch.load(
                 folderName + '/ACKTR-2021.03.05-17_55_16-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_6-area_True-sep_True-backtracking.bak'))
         else:
@@ -287,8 +295,8 @@ def main(args):
             print("Aria count:{}".format(float(area_count)))
     """
 
-    while area_count < 5000:
-        game = make_game(True if b != 6 else False, True if c != 6 else False, "fair")
+    while area_count < 10000:
+        game = make_game(True if b!= 6 and b!= 7 else False, True if c != 6 and c!= 7 else False, "fair", ap_p1=(b==7), ap_p2=(c==7))
         p1_len, p1_area, p2_len, p2_area = game.main_loop(global_brain2.actor_critic, pop_up, None, global_brain.actor_critic,
                        static_brain=static_brain2.actor_critic if c == 1 or c == 2 else None,
                        static_brain2=static_brain.actor_critic if b == 1 or b == 2 else None,
