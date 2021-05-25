@@ -25,7 +25,7 @@ def main(args):
     elif args.b == "8":
         b = 8
     else:
-        b = 7
+        b = 1
 
     if args.c == "2":
         c = 2
@@ -42,7 +42,7 @@ def main(args):
     elif args.c == "8":
         c = 8
     else:
-        c = 7
+        c = 1
 
     if m == "2":
         actor_critic = Net8()  # 신경망 객체 생성
@@ -65,6 +65,8 @@ def main(args):
             global_brain.actor_critic.load_state_dict(torch.load(
                 folderName + '/ACKTR-2021.03.17-12_24_50-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_8-area_True-sep_False-8_40k_oneshot_model.bak'))
         elif b == 6:
+            pass
+        elif b == 7:
             pass
         else:
             global_brain.actor_critic.load_state_dict(torch.load(
@@ -99,6 +101,8 @@ def main(args):
                 folderName + '/ACKTR-2021.03.17-12_24_50-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_8-area_True-sep_False-8_40k_oneshot_model.bak'))
         elif c == 6:
             pass
+        elif c == 7:
+            pass
         else:
             global_brain2.actor_critic.load_state_dict(torch.load(
                 folderName + '/ACKTR-2021.03.15-16_06_55-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_8-area_False-sep_True-8_40k_model.bak'))
@@ -131,6 +135,8 @@ def main(args):
             global_brain.actor_critic.load_state_dict(torch.load(
                 folderName + '/ACKTR-2021.03.17-12_25_08-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-area_True-sep_False-10_40k_oneshot_model.bak'))
         elif b == 6:
+            pass
+        elif b == 7:
             pass
         else:
             global_brain.actor_critic.load_state_dict(torch.load(
@@ -165,6 +171,8 @@ def main(args):
             global_brain2.actor_critic.load_state_dict(torch.load(
                 folderName + '/ACKTR-2021.03.17-12_25_08-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-area_True-sep_False-10_40k_oneshot_model.bak'))
         elif c == 6:
+            pass
+        elif c == 7:
             pass
         else:
             global_brain2.actor_critic.load_state_dict(torch.load(
@@ -258,14 +266,26 @@ def main(args):
     p1_win = 0
     p2_win = 0
 
+    step_time_total = 0
+    step_total = 0
+    sep_time_total = 0
+    len_total = 0
+
     for i in range(iter):
         game = make_game(True if b!= 6 and b!= 7 else False, True if c != 6 and c!= 7 else False, "fair", ap_p1=(b==7), ap_p2=(c==7))
-        game.main_loop(global_brain.actor_critic, pop_up, None, global_brain2.actor_critic,
+        p1_len, _, p2_len, _, sep, time_sum, step_sum, time_takes = game.main_loop(global_brain.actor_critic, pop_up, None, global_brain2.actor_critic,
                        static_brain=static_brain.actor_critic if b == 1 or b == 2 else None,
                        static_brain2=static_brain2.actor_critic if c == 1 or c == 2 else None,
                        oneshot_brain=global_brain.actor_critic if b == 5 else None,
                        oneshot_brain2=global_brain2.actor_critic if c == 5 else None,
                        end_separated=True, agent1=b, agent2=c)
+
+        step_time_total += time_sum
+        step_total += step_sum
+        if sep:
+            sep_time_total += time_takes
+            len_total += p1_len
+            len_total += p2_len
 
         if game.winner is None:
             nullgame+=1
@@ -279,12 +299,19 @@ def main(args):
 
     for i in range(iter):
         game = make_game(True if c!= 6 and c!= 7 else False, True if b != 6 and b != 7 else False, "fair", ap_p1=(c==7), ap_p2=(b==7))
-        game.main_loop(global_brain2.actor_critic, pop_up, None, global_brain.actor_critic,
+        p1_len, _, p2_len, _, sep, time_sum, step_sum, time_takes = game.main_loop(global_brain2.actor_critic, pop_up, None, global_brain.actor_critic,
                        static_brain=static_brain2.actor_critic if c == 1 or c == 2 else None,
                        static_brain2=static_brain.actor_critic if b == 1 or b == 2 else None,
                        oneshot_brain=global_brain2.actor_critic if c == 5 else None,
                        oneshot_brain2=global_brain.actor_critic if b == 5 else None,
                        end_separated=True, agent1=c, agent2=b)
+
+        step_time_total += time_sum
+        step_total += step_sum
+        if sep:
+            sep_time_total += time_takes
+            len_total += p1_len
+            len_total += p2_len
 
         if game.winner is None:
             nullgame+=1
@@ -297,7 +324,7 @@ def main(args):
             print('p1_win')
 
     print("Player 1:{} \n Player 2:{}\n ".format(p1_win,p2_win))
-
+    print("Avg step time in Non-st : {} \nAvg longest path step time in st : {}".format((step_time_total - sep_time_total) / step_total, sep_time_total / float(len_total)))
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 

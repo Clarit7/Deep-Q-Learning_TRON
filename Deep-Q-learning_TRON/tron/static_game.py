@@ -46,7 +46,7 @@ class HistoryElement:
 
 
 class StaticGame:
-    def __init__(self, is_AC, width, height, wall, map_init=None, head_init=None):
+    def __init__(self, is_AC, width, height, wall, map_init=None, head_init=None, gen_map=None):
         self.width = width
         self.height = height
         self.mmap = Map(width, height, Tile.EMPTY, Tile.WALL)
@@ -54,17 +54,30 @@ class StaticGame:
         self.done = False
 
         if map_init is None:
-            self.wall = wall
-            body_list = self.generate_wall()
-            start_position = self.generate_head(body_list)
-            self.pp = PositionPlayer(ACPlayer() if is_AC else MinimaxPlayer(2, "voronoi"), start_position)
+            if gen_map is None:
+                self.wall = wall
+                body_list = self.generate_wall()
+                start_position = self.generate_head(body_list)
+                self.pp = PositionPlayer(ACPlayer() if is_AC else MinimaxPlayer(2, "voronoi"), start_position)
 
-            self.history = [HistoryElement(self.mmap, None, None)]
-            self.history[-1].map[self.pp.position[0], self.pp.position[1]] = self.pp.head()
+                self.history = [HistoryElement(self.mmap, None, None)]
+                self.history[-1].map[self.pp.position[0], self.pp.position[1]] = self.pp.head()
+            else:
+                head_init = [head_init[0].item() - 1, head_init[1].item() - 1]
+                self.generate_map(gen_map)
+                self.pp = PositionPlayer(ACPlayer() if is_AC else MinimaxPlayer(2, "voronoi"), head_init)
+                self.history = [HistoryElement(self.mmap, None, None)]
+                self.history[-1].map[self.pp.position[0], self.pp.position[1]] = self.pp.head()
         else:
             head_init = [head_init[0].item() - 1, head_init[1].item() - 1]
             self.pp = PositionPlayer(ACPlayer() if is_AC else MinimaxPlayer(2, "voronoi"), head_init)
             self.history = [HistoryElement(map_init, None, None)]
+
+    def generate_map(self, gen_map):
+        for i in range(MAP_HEIGHT):
+            for j in range(MAP_WIDTH):
+                if gen_map[0, i+1, j+1] == 1:
+                    self.mmap.__setitem__((i, j), Tile.PLAYER_TWO_BODY)
 
     def generate_head(self, body_list):
         directions = [[1, 0], [0, 1], [-1, 0], [0, -1]]
@@ -319,16 +332,16 @@ class StaticGame:
         _, p1_area = get_direction_area(obs1[0] + obs1[1],
                                        self.pp.position[0] + 1, self.pp.position[1] + 1)
 
-        p1_len = self.get_length_oneshot(1, static_brain)
-
+        p1_len = self.get_aikon_length(1)
 
         """
         p1_len = self.get_length(np.copy(map_clone.state_for_player(1)),
                                  self.pp.position[0] + 1, self.pp.position[1] + 1, 0, None)
         
+        p1_len = self.get_length_oneshot(1, static_brain)
+        
         p1_len = self.get_minimax_length(1)
-
-
+        
         p1_len = self.get_length_masking(1, static_brain)
         """
 
@@ -395,7 +408,101 @@ class StaticGame:
 
             obs_uni = obs[0] + obs[1]
             player_head = torch.nonzero(obs[1] == 10).squeeze(0)
-            act, _ = get_direction_area(obs_uni, player_head[0].item(), player_head[1].item())
+
+            direction = torch.as_tensor([[-1, 0], [0, 1], [1, 0], [0, -1]])
+            has_way = False
+            act = random.choice([1, 2, 3, 4])
+
+            direction_value = [0, 0, 0, 0]
+
+            for e, d in enumerate(direction):
+
+                next_head = d + player_head
+                if obs_uni[next_head[0], next_head[1]] == 0:
+                    obs_next = obs_uni.where(obs_uni != 10, torch.ones([]))
+                    obs_next[next_head[0], next_head[1]] == 10
+                    has_way = True
+                    _, area = get_direction_area(obs_next, next_head[0].item(), next_head[1].item())
+                    direction_value[e] = area
+
+            acts = []
+            if has_way:
+                for e, v in enumerate(direction_value):
+                    if max(direction_value) == v:
+                        acts.append(e + 1)
+
+            if len(acts) > 0:
+                act = random.choice(acts)
+
+            obs_np, done = static_env.step(act, is_area=True)
+            obs = pop_up_static(obs_np)
+            obs = torch.tensor(np.array(obs)).float()
+            obs[0] = masking
+        return duration - 1
+
+    def get_aikon_length(self, player_num):
+        from tron.util import pop_up_static, make_static_game, get_mask, get_direction_area
+
+        obs_np = self.map().state_for_player(player_num)
+        obs = pop_up_static(obs_np)
+        obs = torch.tensor(np.array(obs)).float()
+
+        player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+
+        if player_num == 1:
+            static_env = make_static_game(False, self.map(), player_head)
+        else:
+            static_env = make_static_game(False, self.map(), player_head)
+
+        obs_uni = obs[0] + obs[1]
+        masking = get_mask(obs_uni, player_head[0].item(), player_head[1].item(),
+                           torch.ones((MAP_WIDTH + 2, MAP_HEIGHT + 2)))
+        masking = torch.where(obs[1] != 0, torch.zeros(1), masking)
+        obs[0] = masking
+
+        duration = 0
+        done = 0
+
+        while done == 0:
+            duration += 1
+
+            obs_uni = obs[0] + obs[1]
+            player_head = torch.nonzero(obs[1] == 10).squeeze(0)
+
+            direction = torch.as_tensor([[-1, 0], [0, 1], [1, 0], [0, -1]])
+            has_way = False
+            act = random.choice([1, 2, 3, 4])
+
+            direction_value = [0, 0, 0, 0]
+            wall_count = [0, 0, 0, 0]
+            max_value = 0
+
+            for e, d in enumerate(direction):
+
+                next_head = d + player_head
+                if obs_uni[next_head[0], next_head[1]] == 0:
+                    obs_next = obs_uni.where(obs_uni != 10, torch.ones([]))
+                    obs_next[next_head[0], next_head[1]] = 10
+                    has_way = True
+                    _, area = get_direction_area(obs_next, next_head[0].item(), next_head[1].item())
+                    direction_value[e] = area
+
+                    for d2 in direction:
+                        adj = next_head + d2
+                        if obs_uni[adj[0], adj[1]] == 1:
+                            wall_count[e] += 1
+
+            max_idx = 0
+            if has_way:
+                for e, v in enumerate(direction_value):
+                    if max_value < v:
+                        max_value = v
+                        max_idx = e
+                    elif max_value == v:
+                        if wall_count[max_idx] < wall_count[e]:
+                            max_idx = e
+
+                act = max_idx + 1
 
             obs_np, done = static_env.step(act, is_area=True)
             obs = pop_up_static(obs_np)

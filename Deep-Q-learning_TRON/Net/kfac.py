@@ -202,7 +202,7 @@ class KFACOptimizer(optim.Optimizer):
     def step(self):
         # Add weight decay
         if self.weight_decay > 0:
-            for p in self.model.parameters():
+            for i, p in enumerate(self.model.parameters()):
                 p.grad.data.add_(self.weight_decay, p.data)
 
         updates = {}

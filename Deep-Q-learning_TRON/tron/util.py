@@ -82,7 +82,7 @@ def pop_up_static(map):
 
     return np.concatenate((wall,my),axis=0)
 
-def make_game(p1,p2,mode=None,ap_p1=True, ap_p2=True):
+def make_game(p1,p2,mode=None,ap_p1=True, ap_p2=True, static_brain=None):
 
     if mode == "fair":
         point_y=random.randint(0, MAP_HEIGHT - 1)
@@ -129,14 +129,14 @@ def make_game(p1,p2,mode=None,ap_p1=True, ap_p2=True):
         minimax_mode_p2 = "voronoi"
 
     if ap_p1:
-        mp1 = MinimaxApPlayer(4, minimax_mode_p1)
+        mp1 = MinimaxApPlayer(2, minimax_mode_p1)
     else:
-        mp1 = MinimaxPlayer(4, minimax_mode_p1)
+        mp1 = MinimaxPlayer(2, minimax_mode_p1)
 
     if ap_p2:
-        mp2 = MinimaxApPlayer(4, minimax_mode_p2)
+        mp2 = MinimaxApPlayer(2, minimax_mode_p2)
     else:
-        mp2 = MinimaxPlayer(4, minimax_mode_p2)
+        mp2 = MinimaxPlayer(2, minimax_mode_p2)
 
     game = Game(MAP_WIDTH, MAP_HEIGHT, [
         PositionPlayer(1,  ACPlayer() if p1 else mp1, [x1, y1]),

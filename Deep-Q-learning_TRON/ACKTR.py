@@ -193,7 +193,7 @@ def train(args):
     elif m == "3":
         actor_critic = Net10()
     else:
-        actor_critic = Net6()
+        actor_critic = Net()
 
     global_brain = Brain(actor_critic,args, acktr=True)
 

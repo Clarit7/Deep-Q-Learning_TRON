@@ -176,7 +176,7 @@ def train(args):
     elif args.m == "3":
         actor_critic = NetStatic10()
     else:
-        actor_critic = NetStatic6()
+        actor_critic = Net()
 
     global_brain = Brain_static(actor_critic, args, acktr=True)
 

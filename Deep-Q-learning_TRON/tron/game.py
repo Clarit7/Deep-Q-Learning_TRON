@@ -10,6 +10,7 @@ import torch
 import numpy as np
 import queue
 import random
+import time
 
 class SetQueue(queue.Queue):
     def _init(self, maxsize):
@@ -241,6 +242,7 @@ class Game:
                 next_head = d + player_head
                 if obs_uni[next_head[0], next_head[1]] == 0:
                     obs_next = obs_uni.where(obs_uni != 10, torch.ones([]))
+                    obs_next[next_head[0], next_head[1]] == 10
                     has_way = True
                     _, area = get_direction_area(obs_next, next_head[0].item(), next_head[1].item())
                     direction_value[e] = area
@@ -448,8 +450,10 @@ class Game:
 
 
         sep = False
+        time_takes = 0
         if not done and self.check_separated(map_clone, self.pps[0]):
-
+            sep_start = time.time()
+            """
             from tron.util import get_direction_area, pop_up
             obs_np1 = np.copy(map_clone.state_for_player(1))
             obs1 = pop_up(obs_np1)
@@ -462,10 +466,10 @@ class Game:
             obs2 = torch.tensor(obs2).float()
             _, p2_area = get_direction_area(obs2[0] + obs2[1] + obs2[2],
                                            self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, )
-
+            """
             if agent1 == 3 or agent1 == 4:
                 p1_len = self.get_length_greedy(np.copy(map_clone.state_for_player(1)),
-                                         self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, 0, None) - 1
+                                         self.pps[0].position[0] + 1, self.pps[0].position[1] + 1, 0, None)
             elif agent1 == 5:
                 p1_len = self.get_length_oneshot(1, oneshot_brain)
             elif agent1 == 6:
@@ -493,6 +497,8 @@ class Game:
                                          self.pps[1].position[0] + 1, self.pps[1].position[1] + 1, 0, None) - 1
             else:
                 p2_len = self.get_length_masking(2, static_brain2)
+
+            time_takes = time.time() - sep_start
 
             # winner, p1_length = self.get_longest_path(map_clone, self.pps[0], self.pps[1])
             """
@@ -564,7 +570,7 @@ class Game:
                             self.winner = 1
                         return False
 
-        return True, p1_len, p1_area, p2_len, p2_area, sep
+        return True, p1_len, p1_area, p2_len, p2_area, sep, time_takes
 
     def step(self, action_p1, action_p2, static_brain=None, end_separated=False):
         alive_count = 0
@@ -603,7 +609,12 @@ class Game:
         if not model2:
             model2=model
 
+        time_sum = 0
+        step_sum = 0
+
         while True:
+            start = time.time()
+
             alive_count = 0
             alive = None
 
@@ -657,11 +668,14 @@ class Game:
                         action2 = model2.act(torch.tensor(np.expand_dims(pop(map.state_for_player(2)), axis=0)).float())
                     """
 
-            is_next_frame, p1_len, p1_area, p2_len, p2_area, _ = self.next_frame(action1, action2, window,
+            is_next_frame, p1_len, p1_area, p2_len, p2_area, sep, time_takes = self.next_frame(action1, action2, window,
                                                      static_brain=static_brain, static_brain2=static_brain2,
                                                      oneshot_brain=oneshot_brain, oneshot_brain2=oneshot_brain2,
                                                      end_separated=end_separated, vs_minimax=vs_minimax,
                                                      agent1=agent1, agent2=agent2)
+
+            time_sum += time.time() - start
+            step_sum += 1
 
             if not is_next_frame:
                 break
@@ -681,4 +695,4 @@ class Game:
             if window:
                 window.render_map(self.map())
 
-        return p1_len, p1_area, p2_len, p2_area
+        return p1_len, p1_area, p2_len, p2_area, sep, time_sum, step_sum, time_takes

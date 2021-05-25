@@ -70,7 +70,6 @@ class Minimax(object):
 
         direction_list = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 
-
         for e, direction in enumerate(direction_list):
             ind_next = tuple(sum(elem) for elem in zip(ind, direction))
             if voronoi_region[ind_next] == 5 * player and visited[ind_next] != 1:

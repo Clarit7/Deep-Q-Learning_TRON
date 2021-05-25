@@ -8,67 +8,50 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, 3,padding=1)
+        self.hidden_dim = 32
 
-        self.conv2 = nn.Conv2d(32, 32, 3,padding=1)
-        self.conv3 = nn.Conv2d(32, 32, 3,padding=1)
+        self.conv1 = nn.Conv2d(2, self.hidden_dim, 3, padding=1)
 
-        self.conv4 = nn.Conv2d(32, 64, 3, padding=1)
+        self.conv2 = nn.Conv2d(self.hidden_dim, self.hidden_dim, 3, padding=1)
+        self.conv3 = nn.Conv2d(self.hidden_dim, self.hidden_dim, 3, padding=1)
+        self.conv4 = nn.Conv2d(self.hidden_dim, self.hidden_dim, 3, padding=1)
+        self.conv5 = nn.Conv2d(self.hidden_dim, self.hidden_dim, 3, padding=1)
+        self.conv6 = nn.Conv2d(self.hidden_dim, self.hidden_dim, 3, padding=1)
+        self.conv7 = nn.Conv2d(self.hidden_dim, self.hidden_dim, 3, padding=1)
 
-        self.conv5 = nn.Conv2d(64, 64, 3, padding=1)
-        self.conv6 = nn.Conv2d(64, 64, 3, padding=1)
+        self.conv_actor = nn.Conv2d(self.hidden_dim, 2, 1)
+        self.fc_actor1 = nn.Linear(2 * 12 * 12, 4)
 
-        self.pool=nn.AvgPool2d(kernel_size=3, padding=1, stride=2)
+        self.conv_critic = nn.Conv2d(self.hidden_dim, 1, 1)
+        self.fc_critic1 = nn.Linear(12 * 12, 128)
+        self.fc_critic2 = nn.Linear(128, 1)
 
-        self.conv7=nn.Conv2d(64,64,7,padding=3, stride=2)
-
-        self.fc1 = nn.Linear(64*3*3, 256)
-        self.fc2 = nn.Linear(256, 128)
-
-        self.actor1 = nn.Linear(128, 64)
-        self.actor2 = nn.Linear(64, 4)
-
-        self.critic1 = nn.Linear(128, 64)
-        self.critic2 = nn.Linear(64, 16)
-        self.critic3 = nn.Linear(16, 1)
-
-        self.dropout = nn.Dropout(p=0.2)
-        self.activation = self.mish
+        self.relu = nn.ReLU()
 
     def forward(self, x):
         '''신경망 순전파 계산을 정의'''
         x = x.to(device)
 
-        x = self.activation(self.conv1(x))
+        x = self.relu(self.conv1(x))
 
-        idx = x
+        shortcut = x
+        x = self.relu(self.conv2(x))
+        x = self.relu(self.conv3(x) + shortcut)
+        shortcut = x
+        x = self.relu(self.conv4(x))
+        x = self.relu(self.conv5(x) + shortcut)
+        shortcut = x
+        x = self.relu(self.conv6(x))
+        x = self.relu(self.conv7(x) + shortcut)
 
-        x = self.activation(self.conv2(x))
-        x = self.activation(self.conv3(x)+idx)
+        actor_output = self.conv_actor(x).view(-1, 2 * 12 * 12)
+        actor_output = self.fc_actor1(self.relu(actor_output))
 
-        x = self.activation(self.conv4(x))
-
-        idx = x
-
-        x = self.activation(self.conv5(x))
-        x = self.activation(self.conv6(x)+idx)
-
-        x = self.pool(x)
-
-        x = self.activation(self.conv7(x))
-
-        x = x.view(-1, 64*3*3)
-
-        x = self.dropout(self.activation(self.fc1(x)))
-        x = self.dropout(self.activation(self.fc2(x)))
-
-        actor_output = self.actor2(self.activation(self.actor1(x)))
-
-        critic_output = self.critic2(self.activation(self.critic1(x)))
-        critic_output = self.critic3(self.activation(critic_output))
+        critic_output = self.conv_critic(x).view(-1, 12 * 12)
+        critic_output = self.fc_critic1(self.relu(critic_output))
+        critic_output = self.fc_critic2(self.relu(critic_output))
 
         return critic_output, actor_output
-
 
     def act(self, x):
         '''상태 x로부터 행동을 확률적으로 결정'''
@@ -169,6 +152,7 @@ class NetStatic10(Net):
 
         critic_output = self.critic2(self.activation(self.critic1(x)))
         critic_output = self.critic3(self.activation(critic_output))
+
 
         return critic_output, actor_output
 

@@ -295,7 +295,7 @@ def main(args):
             print("Aria count:{}".format(float(area_count)))
     """
 
-    while area_count < 10000:
+    while area_count < 5000:
         game = make_game(True if b!= 6 and b!= 7 else False, True if c != 6 and c!= 7 else False, "fair", ap_p1=(b==7), ap_p2=(c==7))
         p1_len, p1_area, p2_len, p2_area = game.main_loop(global_brain2.actor_critic, pop_up, None, global_brain.actor_critic,
                        static_brain=static_brain2.actor_critic if c == 1 or c == 2 else None,

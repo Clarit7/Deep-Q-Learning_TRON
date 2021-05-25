@@ -11,10 +11,10 @@ def main(args):
     area_sum = 0
     len_sum = 0
 
-    ac_static = Net8()
+    ac_static = NetStatic6()
     static_brain = Brain(ac_static, args, acktr=True)
     static_brain.actor_critic.load_state_dict(torch.load(
-        folderName + '/ACKTR-2021.03.17-12_25_08-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_10-area_True-sep_False-10_40k_oneshot_model.bak'))
+        folderName + '/ACKTR_pretrain-2021.03.08-15_49_13-ent_0.01-pol_1.2-val_0.7-step_5-process_16-size_6-6_40k_pretrain.bak'))
     static_brain.actor_critic.eval()
 
     for i in range(iter):
