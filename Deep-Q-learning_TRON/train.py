@@ -206,7 +206,7 @@ def train(rank, args, T, shared_model, shared_average_model, optimiser):
                 next_obs = torch.from_numpy(next_obs_np).float()
                 next_obs[0] = masking
                 next_state = next_obs.unsqueeze(0)
-                reward = 0.1 if not done else -1.0  # Optionally clamp rewards
+                reward = 0.3 if not done else -1.0  # Optionally clamp rewards
                 episode_length += 1  # Increase episode counter
 
                 if not args.on_policy:
