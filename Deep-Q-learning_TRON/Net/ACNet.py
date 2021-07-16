@@ -117,13 +117,22 @@ class NetStatic10(Net):
 
         self.conv_critic = nn.Conv2d(self.hidden_dim, 1, 1)
         self.fc_critic1 = nn.Linear(12 * 12, 128)
+<<<<<<< HEAD
         self.fc_critic2 = nn.Linear(128, 4)
+=======
+        self.fc_critic2 = nn.Linear(128, 1)
+>>>>>>> b3a6795819c90aa3cc0c72adf1cdaca5ebfc3637
 
         self.relu = nn.ReLU()
 
     def forward(self, x):
         '''신경망 순전파 계산을 정의'''
+<<<<<<< HEAD
         # x = x.to(device)
+=======
+        x = x.to(device)
+
+>>>>>>> b3a6795819c90aa3cc0c72adf1cdaca5ebfc3637
         x = self.relu(self.conv1(x))
 
         shortcut = x
@@ -135,10 +144,21 @@ class NetStatic10(Net):
         shortcut = x
         x = self.relu(self.conv6(x))
         x = self.relu(self.conv7(x) + shortcut)
+<<<<<<< HEAD
 
         actor_output = self.conv_actor(x).view(-1, 2 * 12 * 12)
         actor_output = F.dropout(self.fc_actor1(self.relu(actor_output)), 0.1)
         actor_output = self.fc_actor2(self.relu(actor_output))
+=======
+
+        actor_output = self.conv_actor(x).view(-1, 2 * 12 * 12)
+        actor_output = F.dropout(self.fc_actor1(self.relu(actor_output)), 0.1)
+        actor_output = self.fc_actor2(self.relu(actor_output))
+
+        critic_output = self.conv_critic(x).view(-1, 12 * 12)
+        critic_output = F.dropout(self.fc_critic1(self.relu(critic_output)), 0.1)
+        critic_output = self.fc_critic2(self.relu(critic_output))
+>>>>>>> b3a6795819c90aa3cc0c72adf1cdaca5ebfc3637
 
         critic_output = self.conv_critic(x).view(-1, 12 * 12)
         critic_output = F.dropout(self.fc_critic1(self.relu(critic_output)), 0.1)
@@ -181,7 +201,10 @@ class NetStatic15(Net):
         self.fc_critic3 = nn.Linear(64, 1)
 
         self.relu = nn.ReLU()
+<<<<<<< HEAD
         self.dropout = nn.Dropout(0.1)
+=======
+>>>>>>> b3a6795819c90aa3cc0c72adf1cdaca5ebfc3637
 
     def forward(self, x):
         '''신경망 순전파 계산을 정의'''
@@ -215,6 +238,7 @@ class NetStatic15(Net):
         x = self.relu(self.conv17(x) + shortcut)
 
         actor_output = self.conv_actor(x).view(-1, 2 * 17 * 17)
+<<<<<<< HEAD
         actor_output = self.fc_actor1(self.dropout(self.relu(actor_output)))
         actor_output = self.fc_actor2(self.dropout(self.relu(actor_output)))
         actor_output = self.fc_actor3(self.dropout(self.relu(actor_output)))
@@ -223,6 +247,16 @@ class NetStatic15(Net):
         critic_output = self.fc_critic1(self.dropout(self.relu(critic_output)))
         critic_output = self.fc_critic2(self.dropout(self.relu(critic_output)))
         critic_output = self.fc_critic3(self.dropout(self.relu(critic_output)))
+=======
+        actor_output = self.fc_actor1(self.relu(actor_output))
+        actor_output = self.fc_actor2(self.relu(actor_output))
+        actor_output = self.fc_actor3(self.relu(actor_output))
+
+        critic_output = self.conv_critic(x).view(-1, 17 * 17)
+        critic_output = self.fc_critic1(self.relu(critic_output))
+        critic_output = self.fc_critic2(self.relu(critic_output))
+        critic_output = self.fc_critic3(self.relu(critic_output))
+>>>>>>> b3a6795819c90aa3cc0c72adf1cdaca5ebfc3637
 
         return critic_output, actor_output
 
