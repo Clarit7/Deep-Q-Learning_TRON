@@ -99,12 +99,12 @@ class SplitBias(nn.Module):
 class KFACOptimizer(optim.Optimizer):
     def __init__(self,
                  model,
-                 lr=0.25,
-                 momentum=0.9,
+                 lr=0.03,
+                 momentum=1.2,
                  stat_decay=0.99,
                  kl_clip=0.001,
                  damping=1e-2,
-                 weight_decay=0,
+                 weight_decay=0.1,
                  fast_cnn=False,
                  Ts=1,
                  Tf=10):

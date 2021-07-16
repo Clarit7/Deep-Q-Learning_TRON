@@ -4,7 +4,7 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/Deep-Q-learning_TRON" isTestSource="false" />
     </content>
-    <orderEntry type="jdk" jdkName="Remote Python 3.7.6 (sftp://jaylee@210.115.46.57:3300/home/jaylee/anaconda3/bin/python)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Remote Python 3.8.3 (sftp://toc@210.115.46.61:3300/home/toc/anaconda3/bin/python)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">

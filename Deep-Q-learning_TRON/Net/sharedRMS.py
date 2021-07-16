@@ -43,6 +43,7 @@ class SharedRMSprop(optim.RMSprop):
 
         # g = αg + (1 - α)Δθ^2
         square_avg.mul_(alpha).addcmul_(1 - alpha, grad, grad)
+
         # θ ← θ - ηΔθ/√(g + ε)
         avg = square_avg.sqrt().add_(group['eps'])
         p.data.addcdiv_(-group['lr'], grad, avg)

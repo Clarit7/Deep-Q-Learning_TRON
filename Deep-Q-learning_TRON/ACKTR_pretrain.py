@@ -70,7 +70,7 @@ class Brain_static(object):
         self.value_loss_coef = value_loss_coef if args.v is None else float(args.v)
 
         if acktr:
-            self.optimizer = KFACOptimizer(self.actor_critic)
+            self.optimizer = KFACOptimizer(self.actor_critic, lr=0.1, momentum=0.7)
         else:
             self.optimizer = optim.RMSprop(
                 self.actor_critic.parameters(), lr, eps=eps, alpha=alpha)
@@ -159,7 +159,7 @@ def train(args):
 
     ai_p1=True
 
-    p= "1" if args.p is None else args.p
+    p = "1" if args.p is None else args.p
     v = "1" if args.v is None else args.v
     m = "1" if args.m is None else args.m
     unique= "" if args.u is None else args.u
@@ -172,11 +172,11 @@ def train(args):
     writer = SummaryWriter('runs/' + eventid)
 
     if args.m == "2":
-        actor_critic = NetStatic8()  # 신경망 객체 생성
+        actor_critic = NetStatic15()  # 신경망 객체 생성
     elif args.m == "3":
-        actor_critic = NetStatic10()
+        actor_critic = NetStatic20()
     else:
-        actor_critic = Net()
+        actor_critic = NetStatic10()
 
     global_brain = Brain_static(actor_critic, args, acktr=True)
 
@@ -212,7 +212,7 @@ def train(args):
     area_sum = 0
 
     # 1 에피소드에 해당하는 반복문
-    while losscount < 40000:  # 전체 for문
+    while losscount < 100000:  # 전체 for문
         # advanced 학습 대상이 되는 각 단계에 대해 계산
         for step in range(NUM_ADVANCED_STEP):
             # 행동을 선택
